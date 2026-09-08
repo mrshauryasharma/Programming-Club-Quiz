@@ -22,8 +22,14 @@ export default function WaitingRoomPage() {
     // Retrieve stored participant credentials
     const storedId = sessionStorage.getItem('pc_quiz_participant_id');
     const storedName = sessionStorage.getItem('pc_quiz_participant_name');
+    const storedCode = sessionStorage.getItem('pc_quiz_session_code');
 
-    if (!storedId) {
+    if (!storedId || storedCode !== code) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('pc_quiz_participant_id');
+        sessionStorage.removeItem('pc_quiz_participant_name');
+        sessionStorage.removeItem('pc_quiz_session_code');
+      }
       router.push(`/?code=${code}`);
       return;
     }

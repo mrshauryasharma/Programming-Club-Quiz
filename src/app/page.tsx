@@ -52,6 +52,22 @@ function JoinQuizFlowContent() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Fresh join session initialization: clear any previous participant or removal state on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pc_quiz_participant_id');
+      sessionStorage.removeItem('pc_quiz_participant_name');
+      sessionStorage.removeItem('pc_quiz_session_code');
+      // Clear any cached answer keys
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('pc_ans_')) {
+          sessionStorage.removeItem(k);
+        }
+      });
+    }
+    setError(null);
+  }, []);
+
   // If URL contains ?code=... from QR scan, prefill and auto-validate
   useEffect(() => {
     const codeParam = searchParams.get('code');
@@ -72,6 +88,13 @@ function JoinQuizFlowContent() {
       return;
     }
 
+    // Clear stale session credentials when validating a code
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pc_quiz_participant_id');
+      sessionStorage.removeItem('pc_quiz_participant_name');
+      sessionStorage.removeItem('pc_quiz_session_code');
+    }
+
     setValidatingCode(true);
 
     try {
@@ -88,6 +111,7 @@ function JoinQuizFlowContent() {
       });
 
       // Advance to STEP 2 (Year) ONLY upon successful validation
+      setError(null);
       setCurrentStep(2);
     } catch (err: any) {
       setError(err.message || 'Invalid Game Code. Please check and try again.');
@@ -293,7 +317,10 @@ function JoinQuizFlowContent() {
                   type="text"
                   maxLength={8}
                   value={gameCode}
-                  onChange={(e) => setGameCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setGameCode(e.target.value.toUpperCase());
+                    setError(null);
+                  }}
                   placeholder="e.g. ABC123"
                   className="w-full px-4 py-3.5 rounded-xl font-mono text-center tracking-widest text-xl font-black uppercase bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
                 />
@@ -325,7 +352,10 @@ function JoinQuizFlowContent() {
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-brand-cardBorderDark/40">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(1)}
+                  onClick={() => {
+                    setError(null);
+                    setCurrentStep(1);
+                  }}
                   className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -377,7 +407,10 @@ function JoinQuizFlowContent() {
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-brand-cardBorderDark/40">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(2)}
+                  onClick={() => {
+                    setError(null);
+                    setCurrentStep(2);
+                  }}
                   className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -402,7 +435,10 @@ function JoinQuizFlowContent() {
                 <select
                   id="departmentSelect"
                   value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
+                  onChange={(e) => {
+                    setDepartment(e.target.value);
+                    setError(null);
+                  }}
                   required
                   className="w-full px-3.5 py-3 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all text-slate-800 dark:text-slate-200 font-medium"
                 >
@@ -434,7 +470,10 @@ function JoinQuizFlowContent() {
                     id="customDepartment"
                     type="text"
                     value={customDepartment}
-                    onChange={(e) => setCustomDepartment(e.target.value)}
+                    onChange={(e) => {
+                      setCustomDepartment(e.target.value);
+                      setError(null);
+                    }}
                     placeholder="Type your official department name..."
                     required
                     className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all font-medium"
@@ -461,7 +500,10 @@ function JoinQuizFlowContent() {
               <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-brand-cardBorderDark/40">
                 <button
                   type="button"
-                  onClick={() => setCurrentStep(3)}
+                  onClick={() => {
+                    setError(null);
+                    setCurrentStep(3);
+                  }}
                   className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
@@ -494,7 +536,10 @@ function JoinQuizFlowContent() {
                   id="name"
                   type="text"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="e.g. Rahul Kumar"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
@@ -513,7 +558,10 @@ function JoinQuizFlowContent() {
                   id="rollNo"
                   type="text"
                   value={rollNo}
-                  onChange={(e) => setRollNo(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setRollNo(e.target.value.toUpperCase());
+                    setError(null);
+                  }}
                   placeholder="e.g. 23CS1042"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono uppercase bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
@@ -532,7 +580,10 @@ function JoinQuizFlowContent() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError(null);
+                  }}
                   placeholder="e.g. rahul@example.com"
                   required
                   className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"

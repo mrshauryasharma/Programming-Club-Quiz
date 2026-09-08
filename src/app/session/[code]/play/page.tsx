@@ -101,8 +101,15 @@ export default function ParticipantPlayPage() {
   useEffect(() => {
     const storedId = sessionStorage.getItem('pc_quiz_participant_id');
     const storedName = sessionStorage.getItem('pc_quiz_participant_name');
+    const storedCode = sessionStorage.getItem('pc_quiz_session_code');
 
-    if (!storedId) {
+    // If no participant credentials exist or session code mismatches this route, redirect cleanly to join
+    if (!storedId || storedCode !== code) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('pc_quiz_participant_id');
+        sessionStorage.removeItem('pc_quiz_participant_name');
+        sessionStorage.removeItem('pc_quiz_session_code');
+      }
       router.push(`/?code=${code}`);
       return;
     }
@@ -160,6 +167,14 @@ export default function ParticipantPlayPage() {
         if (data.participant) {
           setWarningCount(data.participant.warning_count);
           if (data.participant.status === 'removed') setIsRemoved(true);
+        } else {
+          // Stored participant is not in this session; clean storage and redirect to join
+          if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('pc_quiz_participant_id');
+            sessionStorage.removeItem('pc_quiz_participant_name');
+            sessionStorage.removeItem('pc_quiz_session_code');
+          }
+          router.push(`/?code=${code}`);
         }
       })
       .catch(() => {});
@@ -345,8 +360,15 @@ export default function ParticipantPlayPage() {
             </ul>
           </div>
           <button
-            onClick={() => router.push('/')}
-            className="w-full py-3 rounded-xl bg-rose-800 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider transition-colors"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.clear();
+                window.location.href = '/';
+              } else {
+                router.push('/');
+              }
+            }}
+            className="w-full py-3 rounded-xl bg-rose-800 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
           >
             Return to Join Screen
           </button>

@@ -315,7 +315,13 @@ class QuizRepository {
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      let { data } = await supabase.from('live_sessions').select('*').eq('game_code', normalizedCode).maybeSingle();
+      let { data } = await supabase
+        .from('live_sessions')
+        .select('*')
+        .eq('game_code', normalizedCode)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
       if (!data && /^[0-9a-fA-F-]{36}$/.test(trimmed)) {
         const res = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
         data = res.data;
