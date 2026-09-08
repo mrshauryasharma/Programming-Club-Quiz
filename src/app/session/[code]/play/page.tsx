@@ -1,0 +1,693 @@
+'use client';
+
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { ThemeToggle } from '@/components/ThemeToggle';
+import { getSupabaseBrowserClient } from '@/lib/supabase';
+import {
+  Wifi,
+  WifiOff,
+  Maximize2,
+  Minimize2,
+  AlertTriangle,
+  Ban,
+  CheckCircle2,
+  XCircle,
+  Trophy,
+  Clock,
+  Award,
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+
+export default function ParticipantPlayPage() {
+  const params = useParams();
+  const router = useRouter();
+  const code = (params.code as string)?.toUpperCase();
+
+  // Participant identity
+  const [participantId, setParticipantId] = useState('');
+  const [participantName, setParticipantName] = useState('');
+
+  // Session & Question state
+  const [sessionState, setSessionState] = useState<any>(null);
+  const [activeQuestion, setActiveQuestion] = useState<any>(null);
+  const [questionSummary, setQuestionSummary] = useState<any>(null);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+
+  // Submission & Local state
+  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [lastAnswerResult, setLastAnswerResult] = useState<{
+    points: number;
+    is_correct: boolean;
+    response_time_ms: number;
+  } | null>(null);
+
+  // Anti-Cheat & Warning state
+  const [warningCount, setWarningCount] = useState(0);
+  const [isRemoved, setIsRemoved] = useState(false);
+  const [showWarningModal, setShowWarningModal] = useState<number | null>(null);
+
+  // Network & System state
+  const [isConnected, setIsConnected] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [timerRemainingSec, setTimerRemainingSec] = useState<number>(30);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Fullscreen helper
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen().catch(() => {});
+      setIsFullscreen(false);
+    }
+  };
+
+  // Anti-cheat violation reporter
+  const reportViolation = useCallback(
+    async (type: string) => {
+      // Ignore if disconnected (network loss is NOT cheating) or already removed
+      if (!navigator.onLine || isRemoved || !participantId) return;
+
+      try {
+        const res = await fetch(`/api/sessions/${code}/violation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            participant_id: participantId,
+            violation_type: type,
+          }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          setWarningCount(data.warning_count);
+          if (data.is_removed) {
+            setIsRemoved(true);
+          } else {
+            setShowWarningModal(data.warning_count);
+          }
+        }
+      } catch (err) {
+        console.warn('Error reporting violation:', err);
+      }
+    },
+    [code, participantId, isRemoved]
+  );
+
+  // Initial setup & event listeners
+  useEffect(() => {
+    const storedId = sessionStorage.getItem('pc_quiz_participant_id');
+    const storedName = sessionStorage.getItem('pc_quiz_participant_name');
+
+    if (!storedId) {
+      router.push(`/?code=${code}`);
+      return;
+    }
+
+    setParticipantId(storedId);
+    setParticipantName(storedName || 'Participant');
+
+    // Anti-cheat listeners
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        reportViolation('tab_hidden_or_switched');
+      }
+    };
+
+    const handleWindowBlur = () => {
+      reportViolation('window_blur_or_focus_lost');
+    };
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+      if (!document.fullscreenElement) {
+        reportViolation('fullscreen_exited');
+      }
+    };
+
+    // Network connection listeners
+    const handleOnline = () => {
+      setIsConnected(true);
+      // Restore state upon reconnection
+      fetch(`/api/sessions/${code}/restore?participant_id=${storedId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.participant) {
+            setWarningCount(data.participant.warning_count);
+            if (data.participant.status === 'removed') setIsRemoved(true);
+          }
+        })
+        .catch(() => {});
+    };
+
+    const handleOffline = () => {
+      setIsConnected(false);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    // Initial state restore check
+    fetch(`/api/sessions/${code}/restore?participant_id=${storedId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.participant) {
+          setWarningCount(data.participant.warning_count);
+          if (data.participant.status === 'removed') setIsRemoved(true);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [code, router, reportViolation]);
+
+  // Poll state and sync with Supabase Realtime
+  const fetchCurrentState = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/sessions/${code}/state`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setSessionState(data.session);
+      setActiveQuestion(data.activeQuestion);
+      setQuestionSummary(data.questionSummary);
+      if (data.leaderboard) setLeaderboard(data.leaderboard);
+
+      // Reset submission state when moving to a new active question
+      if (data.session.current_state === 'QUESTION_ACTIVE') {
+        const qId = data.activeQuestion?.id;
+        const currentAnsweredQId = sessionStorage.getItem(`pc_ans_${code}_${qId}`);
+        if (currentAnsweredQId) {
+          setSubmitted(true);
+        } else {
+          setSubmitted(false);
+          setSelectedOption(null);
+          setLastAnswerResult(null);
+        }
+
+        // Sync local timer with remaining ms from server
+        if (data.activeQuestion?.remaining_ms !== undefined) {
+          setTimerRemainingSec(Math.ceil(data.activeQuestion.remaining_ms / 1000));
+        }
+      }
+
+      // Check if this participant was removed
+      if (participantId && data.participants) {
+        const me = data.participants.find((p: any) => p.id === participantId);
+        if (me) {
+          setWarningCount(me.warning_count);
+          if (me.status === 'removed') setIsRemoved(true);
+        }
+      }
+
+      // Trigger confetti on final results for winners
+      if (data.session.current_state === 'FINAL_RESULTS' && data.leaderboard) {
+        const topRank = data.leaderboard.find((p: any) => p.id === participantId)?.rank;
+        if (topRank && topRank <= 3) {
+          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        }
+      }
+    } catch (e) {}
+  }, [code, participantId]);
+
+  useEffect(() => {
+    fetchCurrentState();
+    const interval = setInterval(fetchCurrentState, 2000);
+
+    // Supabase Realtime Channel
+    const supabase = getSupabaseBrowserClient();
+    let channel: any = null;
+    if (supabase) {
+      channel = supabase
+        .channel(`session_${code}`)
+        .on('broadcast', { event: 'QUESTION_STARTED' }, () => {
+          fetchCurrentState();
+        })
+        .on('broadcast', { event: 'QUESTION_ENDED' }, () => {
+          fetchCurrentState();
+        })
+        .on('broadcast', { event: 'SHOW_LEADERBOARD' }, () => {
+          fetchCurrentState();
+        })
+        .on('broadcast', { event: 'FINAL_RESULTS' }, () => {
+          fetchCurrentState();
+        })
+        .on('broadcast', { event: 'PARTICIPANT_REMOVED' }, (payload: any) => {
+          if (payload.payload?.participant_id === participantId) {
+            setIsRemoved(true);
+          }
+        })
+        .subscribe();
+    }
+
+    // SSE fallback
+    const eventSource = new EventSource(`/api/sessions/${code}/events`);
+    eventSource.onmessage = () => fetchCurrentState();
+    eventSource.addEventListener('QUESTION_STARTED', () => fetchCurrentState());
+    eventSource.addEventListener('QUESTION_ENDED', () => fetchCurrentState());
+    eventSource.addEventListener('SHOW_LEADERBOARD', () => fetchCurrentState());
+    eventSource.addEventListener('FINAL_RESULTS', () => fetchCurrentState());
+    eventSource.addEventListener('PARTICIPANT_REMOVED', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.participant_id === participantId) setIsRemoved(true);
+      } catch (err) {}
+    });
+
+    return () => {
+      clearInterval(interval);
+      if (channel && supabase) supabase.removeChannel(channel);
+      eventSource.close();
+    };
+  }, [code, fetchCurrentState, participantId]);
+
+  // Local timer countdown tick
+  useEffect(() => {
+    if (sessionState?.current_state === 'QUESTION_ACTIVE') {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = setInterval(() => {
+        setTimerRemainingSec((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    } else {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    }
+    return () => {
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    };
+  }, [sessionState?.current_state]);
+
+  // Submit Answer handler
+  const handleOptionSelect = async (index: number) => {
+    if (submitted || isRemoved || sessionState?.current_state !== 'QUESTION_ACTIVE') return;
+
+    setSelectedOption(index);
+    setSubmitted(true);
+
+    if (activeQuestion?.id) {
+      sessionStorage.setItem(`pc_ans_${code}_${activeQuestion.id}`, `${index}`);
+    }
+
+    try {
+      const res = await fetch(`/api/sessions/${code}/submit-answer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participant_id: participantId,
+          question_id: activeQuestion.id,
+          selected_option: index,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setLastAnswerResult({
+          points: data.points,
+          is_correct: data.is_correct,
+          response_time_ms: data.response_time_ms,
+        });
+      }
+    } catch (err) {
+      console.warn('Error submitting answer:', err);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // STATE: REMOVED SCREEN (Warning 3 strike)
+  // -------------------------------------------------------------
+  if (isRemoved) {
+    return (
+      <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#020205] text-white">
+        <div className="w-full max-w-md p-8 rounded-2xl bg-rose-950/40 border border-rose-800 text-center shadow-2xl backdrop-blur-md">
+          <div className="w-16 h-16 mx-auto rounded-full bg-rose-900/60 flex items-center justify-center text-rose-400 mb-4 border border-rose-700">
+            <Ban className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-black text-rose-400 tracking-tight">REMOVED FROM SESSION</h2>
+          <p className="text-xs text-rose-300/80 mt-2 leading-relaxed">
+            You have received 3 confirmed anti-cheat warnings (tab switches, window focus loss, or leaving the quiz window).
+          </p>
+          <div className="my-6 p-4 rounded-xl bg-rose-900/20 border border-rose-800/40 text-left text-xs space-y-2">
+            <p className="font-semibold text-rose-200">Session Rules Enforcement:</p>
+            <ul className="list-disc pl-4 text-rose-300/70 space-y-1">
+              <li>Answering is permanently disabled for this session.</li>
+              <li>Your previous score and rankings will no longer apply.</li>
+              <li>You cannot rejoin this active session with another tab.</li>
+            </ul>
+          </div>
+          <button
+            onClick={() => router.push('/')}
+            className="w-full py-3 rounded-xl bg-rose-800 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider transition-colors"
+          >
+            Return to Join Screen
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#F7F4FE] via-white to-[#EDE8FD] dark:from-[#020205] dark:via-[#030926] dark:to-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+      {/* Network Disconnect Warning Banner */}
+      {!isConnected && (
+        <div className="w-full bg-rose-600 text-white text-xs font-bold py-2 px-4 text-center flex items-center justify-center gap-2 shadow-md">
+          <WifiOff className="w-4 h-4 animate-pulse" />
+          <span>Connection Lost. Reconnecting to live session... (Normal network loss is not penalized)</span>
+        </div>
+      )}
+
+      {/* Top Bar */}
+      <header className="w-full max-w-2xl mx-auto flex items-center justify-between py-2 border-b border-slate-200 dark:border-brand-cardBorderDark/50">
+        <div className="flex items-center gap-2">
+          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-brand-purple/40">
+            <Image src="/logo.png" alt="Logo" fill className="object-contain" />
+          </div>
+          <div>
+            <h1 className="text-xs font-bold text-brand-purple">USICT GBU</h1>
+            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{participantName}</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            className="p-1.5 rounded-lg bg-slate-200 dark:bg-brand-cardDark text-slate-700 dark:text-slate-300 hover:text-brand-purple transition-all"
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
+          {/* Warning Badge */}
+          {warningCount > 0 && (
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+              <AlertTriangle className="w-3 h-3" />
+              <span>
+                {warningCount}/3 {warningCount === 1 ? 'Warning' : 'Warnings'}
+              </span>
+            </div>
+          )}
+
+          <ThemeToggle />
+        </div>
+      </header>
+
+      {/* Anti-Cheat Warning Modal (Warning 1 & 2) */}
+      {showWarningModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-sm p-6 rounded-2xl bg-white dark:bg-[#070E28] border border-amber-500 text-center shadow-2xl animate-in zoom-in-95">
+            <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 mb-3">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight">
+              Anti-Cheat Warning {showWarningModal} of 3
+            </h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">
+              You navigated away from the quiz window or switched tabs.
+              {showWarningModal === 1 && ' This is your 1st warning. Please remain on this screen.'}
+              {showWarningModal === 2 && ' CAUTION: A 3rd violation will cause IMMEDIATE REMOVAL.'}
+            </p>
+            <button
+              onClick={() => setShowWarningModal(null)}
+              className="mt-5 w-full py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+            >
+              I Understand & Remain Focused
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Dynamic State View Container */}
+      <div className="w-full max-w-2xl mx-auto my-auto py-4">
+        {/* -------------------------------------------------------- */}
+        {/* 1. STATE: WAITING FOR ORGANIZER */}
+        {/* -------------------------------------------------------- */}
+        {sessionState?.current_state === 'WAITING' && (
+          <div className="text-center p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
+            <div className="w-12 h-12 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-bold">Waiting for next question...</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Organizer will start the question shortly.
+            </p>
+          </div>
+        )}
+
+        {/* -------------------------------------------------------- */}
+        {/* 2. STATE: QUESTION ACTIVE */}
+        {/* -------------------------------------------------------- */}
+        {sessionState?.current_state === 'QUESTION_ACTIVE' && activeQuestion && (
+          <div className="space-y-4">
+            {/* Question Progress & Timer Bar */}
+            <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
+              <div className="text-xs font-bold text-brand-purple tracking-wide">
+                Question {activeQuestion.order_index + 1} of {activeQuestion.total_questions}
+              </div>
+
+              {/* Strict Countdown Timer Display */}
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold transition-all ${
+                  timerRemainingSec <= 5
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{timerRemainingSec}s</span>
+              </div>
+            </div>
+
+            {/* Question Card */}
+            <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
+              <h2 className="text-lg sm:text-xl font-bold leading-snug tracking-tight text-brand-navy dark:text-white">
+                {activeQuestion.question_text}
+              </h2>
+            </div>
+
+            {/* MCQ Answer Options */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {activeQuestion.options.map((option: string, idx: number) => {
+                const isSelected = selectedOption === idx;
+                const optionLetters = ['A', 'B', 'C', 'D'];
+
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => handleOptionSelect(idx)}
+                    disabled={submitted || timerRemainingSec === 0}
+                    className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.98] ${
+                      isSelected
+                        ? 'bg-brand-purple text-white border-brand-purple shadow-md scale-[1.01]'
+                        : submitted
+                        ? 'opacity-60 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                        : 'bg-white/90 dark:bg-brand-cardDark/90 border-slate-300 dark:border-brand-cardBorderDark hover:border-brand-purple/60 hover:bg-brand-purple/5'
+                    }`}
+                  >
+                    <span
+                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                        isSelected
+                          ? 'bg-white text-brand-purple'
+                          : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      {optionLetters[idx]}
+                    </span>
+                    <span className="text-sm font-medium leading-relaxed mt-0.5">{option}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Submission confirmation note */}
+            {submitted && (
+              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs text-center font-semibold flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Answer Submitted! Results will display when the timer ends.</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* -------------------------------------------------------- */}
+        {/* 3. STATE: QUESTION ENDED / RESULT DISPLAY */}
+        {/* -------------------------------------------------------- */}
+        {sessionState?.current_state === 'QUESTION_ENDED' && (
+          <div className="space-y-4">
+            <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl text-center">
+              {lastAnswerResult ? (
+                <div>
+                  <div
+                    className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3 ${
+                      lastAnswerResult.is_correct
+                        ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-400'
+                        : 'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-400'
+                    }`}
+                  >
+                    {lastAnswerResult.is_correct ? (
+                      <CheckCircle2 className="w-9 h-9" />
+                    ) : (
+                      <XCircle className="w-9 h-9" />
+                    )}
+                  </div>
+
+                  <h3 className="text-2xl font-black">
+                    {lastAnswerResult.is_correct ? 'CORRECT ANSWER!' : 'INCORRECT ANSWER'}
+                  </h3>
+
+                  {/* Absolute scoring display */}
+                  <div className="inline-flex items-center gap-2 mt-3 px-4 py-1.5 rounded-full text-sm font-extrabold bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple">
+                    <span>{lastAnswerResult.is_correct ? '+2 Points' : '+0 Points'}</span>
+                    <span>•</span>
+                    <span>{(lastAnswerResult.response_time_ms / 1000).toFixed(2)} sec</span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="w-16 h-16 mx-auto rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
+                    <Clock className="w-8 h-8" />
+                  </div>
+                  <h3 className="text-xl font-bold">Time Expired / No Answer</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">+0 Points</p>
+                </div>
+              )}
+
+              {/* Reveal Correct Answer */}
+              {activeQuestion && activeQuestion.correct_option_index !== undefined && (
+                <div className="mt-5 p-3.5 rounded-xl bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark text-xs text-left">
+                  <span className="font-semibold text-slate-500 dark:text-slate-400">Correct Answer:</span>
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
+                    {activeQuestion.options[activeQuestion.correct_option_index]}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+              Organizer will transition to leaderboard or next question shortly...
+            </p>
+          </div>
+        )}
+
+        {/* -------------------------------------------------------- */}
+        {/* 4. STATE: LEADERBOARD */}
+        {/* -------------------------------------------------------- */}
+        {sessionState?.current_state === 'SHOW_LEADERBOARD' && (
+          <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-amber-500" />
+                <h3 className="text-lg font-bold">Current Leaderboard</h3>
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                Tie-broken by total response time
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {leaderboard.slice(0, 10).map((p: any, idx: number) => {
+                const isMe = p.id === participantId;
+                return (
+                  <div
+                    key={p.id}
+                    className={`flex items-center justify-between p-3 rounded-xl text-xs font-semibold transition-all ${
+                      isMe
+                        ? 'bg-brand-purple/15 text-brand-purple border border-brand-purple/40 font-bold'
+                        : 'bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`w-6 h-6 rounded-md flex items-center justify-center font-mono font-bold ${
+                          idx === 0
+                            ? 'bg-amber-400 text-slate-900'
+                            : idx === 1
+                            ? 'bg-slate-300 text-slate-900'
+                            : idx === 2
+                            ? 'bg-amber-700 text-white'
+                            : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                        }`}
+                      >
+                        {idx + 1}
+                      </span>
+                      <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                        {p.name} {isMe && '(You)'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-slate-500 dark:text-slate-400 font-mono">
+                        {(p.total_response_time_ms / 1000).toFixed(1)}s
+                      </span>
+                      <span className="font-extrabold text-brand-purple text-sm">{p.total_score} pts</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* -------------------------------------------------------- */}
+        {/* 5. STATE: FINAL RESULTS */}
+        {/* -------------------------------------------------------- */}
+        {(sessionState?.current_state === 'FINAL_RESULTS' || sessionState?.current_state === 'COMPLETED') && (
+          <div className="p-6 sm:p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-amber-400/20 text-amber-500 flex items-center justify-center mb-4">
+              <Award className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-black">Quiz Completed!</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Thank you for participating with the USICT GBU Programming Club.
+            </p>
+
+            {/* Participant Personal Final Score */}
+            {(() => {
+              const me = leaderboard.find((p: any) => p.id === participantId);
+              if (!me) return null;
+              const totalQ = activeQuestion?.total_questions || 5;
+              const maxPts = totalQ * 2;
+
+              return (
+                <div className="my-6 p-5 rounded-2xl bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark">
+                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Your Final Score</span>
+                  <div className="text-3xl font-black text-brand-purple mt-1">
+                    {me.total_score} / {maxPts} Points
+                  </div>
+                  <div className="mt-3 flex items-center justify-center gap-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <div>
+                      Rank: <span className="text-brand-purple font-bold">#{me.rank}</span>
+                    </div>
+                    <div>•</div>
+                    <div>
+                      Total Time: <span className="font-mono">{(me.total_response_time_ms / 1000).toFixed(2)}s</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            <button
+              onClick={() => router.push('/')}
+              className="mt-2 py-3 px-6 rounded-xl font-bold text-xs bg-brand-purple text-white shadow-md hover:bg-[#6A1694] transition-colors"
+            >
+              Exit Quiz
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="w-full max-w-2xl mx-auto text-center py-2 text-[11px] text-slate-500 dark:text-slate-400">
+        <p>USICT GBU Programming Club • LEARN • CONNECT • EXPLORE • GROW</p>
+      </footer>
+    </main>
+  );
+}
