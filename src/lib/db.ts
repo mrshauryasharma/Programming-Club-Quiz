@@ -1,4 +1,4 @@
-import { Quiz, Question, Session, Participant, Answer, SessionState, QuestionResultSummary, SecurityLog } from '@/types/quiz';
+import { Quiz, Question, Session, Participant, Answer, SessionState, QuestionResultSummary, SecurityLog, SessionHistoryItem } from '@/types/quiz';
 import { getSupabaseServerClient } from './supabase';
 
 // Global in-memory storage for high-speed state, automated testing, and fallback when Supabase keys are not set
@@ -307,13 +307,19 @@ class QuizRepository {
   }
 
   public async getSessionByCode(code: string): Promise<Session | null> {
-    const normalizedCode = code.trim().toUpperCase();
-    const session = this.sessions.get(normalizedCode);
+    if (!code) return null;
+    const trimmed = code.trim();
+    const normalizedCode = trimmed.toUpperCase();
+    const session = this.sessions.get(normalizedCode) || this.sessions.get(trimmed);
     if (session) return session;
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data } = await supabase.from('live_sessions').select('*').eq('game_code', normalizedCode).single();
+      let { data } = await supabase.from('live_sessions').select('*').eq('game_code', normalizedCode).maybeSingle();
+      if (!data && /^[0-9a-fA-F-]{36}$/.test(trimmed)) {
+        const res = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
+        data = res.data;
+      }
       if (data) {
         const s: Session = {
           id: data.id,
@@ -327,7 +333,7 @@ class QuizRepository {
           ended_at: data.ended_at,
         };
         this.sessions.set(s.id, s);
-        this.sessions.set(normalizedCode, s);
+        this.sessions.set(s.game_code, s);
         return s;
       }
     }
@@ -335,11 +341,18 @@ class QuizRepository {
   }
 
   public async getSessionById(id: string): Promise<Session | null> {
-    const session = this.sessions.get(id);
+    if (!id) return null;
+    const trimmed = id.trim();
+    const session = this.sessions.get(trimmed) || this.sessions.get(trimmed.toUpperCase());
     if (session) return session;
+
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data } = await supabase.from('live_sessions').select('*').eq('id', id).single();
+      let { data } = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
+      if (!data && trimmed.length === 6) {
+        const res = await supabase.from('live_sessions').select('*').eq('game_code', trimmed.toUpperCase()).maybeSingle();
+        data = res.data;
+      }
       if (data) {
         const s: Session = {
           id: data.id,
@@ -352,10 +365,46 @@ class QuizRepository {
           created_at: data.created_at,
           ended_at: data.ended_at,
         };
+        this.sessions.set(s.id, s);
+        this.sessions.set(s.game_code, s);
         return s;
       }
     }
     return null;
+  }
+
+  // Delete a specific live quiz event/session strictly scoped to this session ID
+  public async deleteSession(sessionId: string): Promise<boolean> {
+    const session = (await this.getSessionById(sessionId)) || (await this.getSessionByCode(sessionId));
+    if (!session) return false;
+
+    // 1. Remove from in-memory maps
+    this.sessions.delete(session.id);
+    this.sessions.delete(session.game_code);
+    this.participants.delete(session.id);
+    this.answers.delete(session.id);
+    this.securityLogs.delete(session.id);
+
+    // 2. Remove strictly scoped data from Supabase if connected
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        // Delete child tables first to respect FK constraints
+        await supabase.from('answers').delete().eq('session_id', session.id);
+        await supabase.from('security_logs').delete().eq('session_id', session.id);
+        await supabase.from('participants').delete().eq('session_id', session.id);
+        const { error } = await supabase.from('live_sessions').delete().eq('id', session.id);
+        if (error) {
+          console.error('Supabase live_sessions delete error:', error);
+          throw new Error(error.message);
+        }
+      } catch (err: any) {
+        console.error('Failed to delete session from Supabase:', err);
+        throw err;
+      }
+    }
+
+    return true;
   }
 
   // Participant Join
@@ -807,8 +856,30 @@ class QuizRepository {
     if (!quiz || !quiz.questions || !quiz.questions[questionIndex]) return null;
 
     const q = quiz.questions[questionIndex];
-    const answersList = (this.answers.get(sessionId) || []).filter(a => a.question_id === q.id);
-    const participants = await this.getParticipants(sessionId);
+    let answersList = this.answers.get(session.id);
+    if (!answersList || answersList.length === 0) {
+      const supabase = getSupabaseServerClient();
+      if (supabase) {
+        const { data } = await supabase.from('answers').select('*').eq('session_id', session.id);
+        if (data && data.length > 0) {
+          answersList = data.map((d: any) => ({
+            id: d.id,
+            session_id: d.session_id,
+            participant_id: d.participant_id,
+            question_id: d.question_id,
+            selected_option: d.selected_option,
+            is_correct: d.is_correct,
+            points: d.points_awarded ?? (d.is_correct ? 2 : 0),
+            response_time_ms: d.response_time_ms ?? 0,
+            submitted_at: d.created_at || new Date().toISOString(),
+          }));
+          this.answers.set(session.id, answersList);
+        }
+      }
+    }
+
+    const questionAnswers = (answersList || []).filter(a => a.question_id === q.id);
+    const participants = await this.getParticipants(session.id);
 
     const option_counts: [number, number, number, number] = [0, 0, 0, 0];
     let correct_count = 0;
@@ -817,7 +888,7 @@ class QuizRepository {
     let fastest_answer_ms: number | null = null;
     let fastest_participant_name: string | null = null;
 
-    for (const ans of answersList) {
+    for (const ans of questionAnswers) {
       if (ans.selected_option >= 0 && ans.selected_option <= 3) {
         option_counts[ans.selected_option as 0 | 1 | 2 | 3] += 1;
       }
@@ -838,31 +909,33 @@ class QuizRepository {
       question_id: q.id,
       question_text: q.question_text,
       correct_option_index: q.correct_option_index,
-      total_answers: answersList.length,
+      total_answers: questionAnswers.length,
       correct_count,
       incorrect_count,
       option_counts,
       fastest_answer_ms,
       fastest_participant_name,
-      average_response_time_ms: answersList.length > 0 ? Math.round(total_time / answersList.length) : null,
+      average_response_time_ms: questionAnswers.length > 0 ? Math.round(total_time / questionAnswers.length) : null,
     };
   }
 
   // Analytics for completed session
   public async getSessionAnalytics(sessionId: string) {
-    const session = await this.getSessionById(sessionId);
+    let session = await this.getSessionById(sessionId);
+    if (!session) {
+      session = await this.getSessionByCode(sessionId);
+    }
     if (!session) return null;
 
     const quiz = await this.getQuizById(session.quiz_id);
     if (!quiz || !quiz.questions) return null;
 
-    const participants = await this.getParticipants(sessionId);
-    const leaderboard = await this.getLeaderboard(sessionId);
-    const answers = this.answers.get(sessionId) || [];
+    const participants = await this.getParticipants(session.id);
+    const leaderboard = await this.getLeaderboard(session.id);
 
     const questionSummaries: QuestionResultSummary[] = [];
     for (let i = 0; i < quiz.questions.length; i++) {
-      const summary = await this.getQuestionSummary(sessionId, i);
+      const summary = await this.getQuestionSummary(session.id, i);
       if (summary) questionSummaries.push(summary);
     }
 
@@ -897,14 +970,98 @@ class QuizRepository {
     };
   }
 
-  // Session History
-  public async getSessionHistory(): Promise<Session[]> {
-    const list = Array.from(this.sessions.values()).filter((s, idx, arr) => arr.findIndex(x => x.id === s.id) === idx);
-    return list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  // Session History — Retrieves persistent history of all quiz events
+  public async getSessionHistory(): Promise<SessionHistoryItem[]> {
+    const historyMap = new Map<string, SessionHistoryItem>();
+
+    // 1. Check in-memory active & past sessions
+    for (const s of this.sessions.values()) {
+      if (!historyMap.has(s.id)) {
+        const quiz = await this.getQuizById(s.quiz_id);
+        const participants = await this.getParticipants(s.id);
+        const avgScore =
+          participants.length > 0
+            ? (participants.reduce((acc, p) => acc + p.total_score, 0) / participants.length).toFixed(1)
+            : '0.0';
+
+        historyMap.set(s.id, {
+          id: s.id,
+          quiz_id: s.quiz_id,
+          quiz_title: quiz?.title || 'Programming Club Quiz',
+          game_code: s.game_code,
+          status: s.status,
+          current_state: s.current_state,
+          created_at: s.created_at,
+          ended_at: s.ended_at,
+          total_participants: participants.length,
+          average_score: avgScore,
+          total_questions: quiz?.questions?.length || 0,
+        });
+      }
+    }
+
+    // 2. Fetch from Supabase live_sessions if connected
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data: dbSessions } = await supabase
+          .from('live_sessions')
+          .select(`
+            id,
+            quiz_id,
+            game_code,
+            status,
+            current_state,
+            created_at,
+            ended_at,
+            quizzes (
+              id,
+              title
+            ),
+            participants (
+              id,
+              score
+            )
+          `)
+          .order('created_at', { ascending: false });
+
+        if (dbSessions) {
+          for (const row of dbSessions) {
+            const quiz = await this.getQuizById(row.quiz_id);
+            const quizTitle = (row.quizzes as any)?.title || quiz?.title || 'Programming Club Quiz';
+            const participantsList = (row.participants as any[]) || (await this.getParticipants(row.id));
+            const avgScore =
+              participantsList.length > 0
+                ? (participantsList.reduce((acc, p) => acc + (p.score ?? p.total_score ?? 0), 0) / participantsList.length).toFixed(1)
+                : '0.0';
+
+            historyMap.set(row.id, {
+              id: row.id,
+              quiz_id: row.quiz_id,
+              quiz_title: quizTitle,
+              game_code: row.game_code,
+              status: (row.status?.toLowerCase() || 'waiting') as any,
+              current_state: (row.current_state || 'WAITING') as any,
+              created_at: row.created_at,
+              ended_at: row.ended_at,
+              total_participants: participantsList.length,
+              average_score: avgScore,
+              total_questions: quiz?.questions?.length || 0,
+            });
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase getSessionHistory error:', err);
+      }
+    }
+
+    return Array.from(historyMap.values()).sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   }
 }
 
 // Singleton global repository instance
 const globalForQuiz = global as unknown as { quizRepository: QuizRepository };
 export const db = globalForQuiz.quizRepository || new QuizRepository();
-if (process.env.NODE_ENV !== 'production') globalForQuiz.quizRepository = db;
+globalForQuiz.quizRepository = db;

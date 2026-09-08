@@ -100,6 +100,13 @@ export default function OrganizerDashboardPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link
+            href="/organizer/history"
+            className="px-3.5 py-1.5 rounded-xl bg-slate-200 dark:bg-brand-cardDark text-slate-700 dark:text-slate-200 hover:bg-brand-purple hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+          >
+            <History className="w-4 h-4" />
+            <span>History</span>
+          </Link>
           <ThemeToggle />
           <button
             onClick={handleLogout}
@@ -122,13 +129,23 @@ export default function OrganizerDashboardPage() {
             </p>
           </div>
 
-          <Link
-            href="/organizer/quizzes/new"
-            className="px-4 py-2.5 rounded-xl bg-brand-purple hover:bg-[#6A1694] text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-brand-purple/20 flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Create New Quiz</span>
-          </Link>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Link
+              href="/organizer/history"
+              className="px-4 py-2.5 rounded-xl border border-brand-purple/30 dark:border-brand-purple/40 bg-brand-purple/10 hover:bg-brand-purple/20 text-brand-purple dark:text-purple-300 font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+            >
+              <History className="w-4 h-4" />
+              <span>Event History</span>
+            </Link>
+
+            <Link
+              href="/organizer/quizzes/new"
+              className="px-4 py-2.5 rounded-xl bg-brand-purple hover:bg-[#6A1694] text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-brand-purple/20 flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Create New Quiz</span>
+            </Link>
+          </div>
         </div>
 
         {/* Quiz Cards Grid */}

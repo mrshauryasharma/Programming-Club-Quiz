@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { broadcastSessionEvent, RealtimeEvent } from '@/lib/realtime';
+import { startQuestionTimer, scheduleNextAdvance, cancelSessionTimer } from '@/lib/sessionTimer';
 
 export async function POST(req: NextRequest, context: { params: Promise<{ code: string }> }) {
   try {
@@ -35,6 +36,19 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
       current_question_index: session.current_question_index,
       question_start_time: session.question_start_time,
     });
+
+    // Server-authoritative timer orchestration
+    if (session.current_state === 'QUESTION_ACTIVE') {
+      const quiz = await db.getQuizById(session.quiz_id);
+      const q = quiz?.questions?.[session.current_question_index];
+      if (q) {
+        startQuestionTimer(session.id, session.game_code, session.current_question_index, q.timer_seconds * 1000);
+      }
+    } else if (session.current_state === 'QUESTION_ENDED') {
+      scheduleNextAdvance(session.id, session.game_code, session.current_question_index);
+    } else {
+      cancelSessionTimer(session.id);
+    }
 
     return NextResponse.json({ session });
   } catch (error: any) {

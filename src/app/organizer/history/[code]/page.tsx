@@ -60,13 +60,22 @@ export default function QuizHistoryAnalyticsPage() {
     <main className="min-h-screen p-4 sm:p-8 bg-[#F7F4FE] dark:bg-[#020205] text-[#031246] dark:text-[#F7F4FE]">
       {/* Top Header */}
       <header className="max-w-5xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200 dark:border-brand-cardBorderDark">
-        <Link
-          href="/organizer/dashboard"
-          className="inline-flex items-center gap-2 text-xs font-bold text-brand-purple hover:underline"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Dashboard</span>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/organizer/history"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-purple hover:underline"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Event History</span>
+          </Link>
+          <span className="text-slate-300 dark:text-slate-700">•</span>
+          <Link
+            href="/organizer/dashboard"
+            className="text-xs font-semibold text-slate-500 hover:text-brand-purple hover:underline"
+          >
+            Dashboard
+          </Link>
+        </div>
 
         <div className="flex items-center gap-3">
           {/* Real Export Download Actions */}

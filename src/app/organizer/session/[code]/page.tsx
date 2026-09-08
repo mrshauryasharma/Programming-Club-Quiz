@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   FileText,
   Clock,
+  BarChart3,
 } from 'lucide-react';
 
 export default function OrganizerLiveSessionPage() {
@@ -227,7 +228,14 @@ export default function OrganizerLiveSessionPage() {
               )}
 
               {(currentState === 'FINAL_RESULTS' || currentState === 'COMPLETED') && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Link
+                    href={`/organizer/history/${code}`}
+                    className="px-3.5 py-2 rounded-xl bg-brand-purple hover:bg-[#6A1694] text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5" />
+                    <span>View Analytics & Report</span>
+                  </Link>
                   <a
                     href={`/api/sessions/${code}/export/csv`}
                     download

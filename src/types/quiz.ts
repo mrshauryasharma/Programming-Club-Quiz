@@ -100,3 +100,17 @@ export interface QuestionResultSummary {
   fastest_participant_name: string | null;
   average_response_time_ms: number | null;
 }
+
+export interface SessionHistoryItem {
+  id: string; // Session ID (UUID)
+  quiz_id: string;
+  quiz_title: string;
+  game_code: string;
+  status: SessionStatus;
+  current_state: SessionState;
+  created_at: string;
+  ended_at?: string | null;
+  total_participants: number;
+  average_score: string;
+  total_questions: number;
+}

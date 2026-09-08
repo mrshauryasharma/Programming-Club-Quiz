@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { checkAndAdvanceIfExpired } from '@/lib/sessionTimer';
 
 export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
   try {
     const { code } = await context.params;
-    const session = await db.getSessionByCode(code);
+    let session = await db.getSessionByCode(code);
+    if (!session) {
+      session = await db.getSessionById(code);
+    }
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+
+    // Authoritative check: Automatically advance if timer expired
+    session = await checkAndAdvanceIfExpired(session);
 
     const quiz = await db.getQuizById(session.quiz_id);
     const participants = await db.getParticipants(session.id);

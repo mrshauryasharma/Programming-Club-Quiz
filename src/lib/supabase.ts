@@ -23,11 +23,16 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
 }
 
 export function getSupabaseServerClient(): SupabaseClient | null {
-  if (!supabaseUrl) return null;
-  const key = supabaseServiceRoleKey || supabaseAnonKey;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || supabaseUrl;
+  if (!url) return null;
+  const key =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    supabaseServiceRoleKey ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    supabaseAnonKey;
   if (!key) return null;
   if (!serverClient) {
-    serverClient = createClient(supabaseUrl, key, {
+    serverClient = createClient(url, key, {
       auth: { persistSession: false },
     });
   }

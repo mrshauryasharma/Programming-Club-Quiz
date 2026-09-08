@@ -32,34 +32,61 @@ Output ONLY valid JSON array with objects matching:
 }
 Strictly ensure each question has exactly 4 options and timer_seconds is between 15 and 60.`;
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // Meta AI Official Endpoint (api.meta.ai) or custom endpoint
+    const apiEndpoint = process.env.META_AI_BASE_URL || 'https://api.meta.ai/v1/chat/completions';
+    const modelName = process.env.META_AI_MODEL || 'muse-spark-1.3';
+
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${metaApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // Official Meta Llama model
+        model: modelName,
         messages: [{ role: 'user', content: prompt }],
-        response_format: { type: 'json_object' },
         temperature: 0.5,
       }),
     });
 
     if (!response.ok) {
-      const errBody = await response.text();
+      let friendlyMessage = `Meta AI service returned status ${response.status}`;
+      try {
+        const errJson = await response.json();
+        if (errJson?.error?.code === 'billing_not_configured' || response.status === 402) {
+          friendlyMessage = 'Meta AI account billing is not configured or credit limit reached. Please verify payment method in the Meta AI dashboard.';
+        } else if (response.status === 401 || errJson?.error?.code === 'invalid_api_key') {
+          friendlyMessage = 'Invalid Meta AI API Key. Please verify META_AI_API_KEY in your server configuration.';
+        } else if (errJson?.error?.message) {
+          friendlyMessage = `Meta AI error: ${errJson.error.message}`;
+        }
+      } catch {
+        // non-json response
+      }
+
       return NextResponse.json(
-        { error: `Meta AI request failed: ${response.status} ${response.statusText} (${errBody})` },
+        { error: friendlyMessage },
         { status: response.status }
       );
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    const parsed = JSON.parse(content);
-    const questions = Array.isArray(parsed) ? parsed : parsed.questions || [];
+    let questions = [];
 
-    return NextResponse.json({ success: true, provider: 'Meta AI (Llama)', questions });
+    try {
+      // Clean possible markdown code fences if returned
+      const cleanJson = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+      questions = Array.isArray(parsed) ? parsed : parsed.questions || [];
+    } catch {
+      return NextResponse.json(
+        { error: 'Meta AI returned an unexpected response format. Please try again.' },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({ success: true, provider: 'Meta AI', questions });
   } catch (error: any) {
     return NextResponse.json(
       { error: `Meta AI generation error: ${error.message || 'Unknown error'}. No fallback provider used.` },

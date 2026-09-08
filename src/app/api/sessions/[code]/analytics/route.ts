@@ -4,7 +4,10 @@ import { db } from '@/lib/db';
 export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
   try {
     const { code } = await context.params;
-    const session = await db.getSessionByCode(code);
+    let session = await db.getSessionByCode(code);
+    if (!session) {
+      session = await db.getSessionById(code);
+    }
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
