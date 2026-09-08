@@ -27,6 +27,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         Rank: p.rank || 0,
         Name: p.name,
         'Roll Number': p.roll_no,
+        Year: p.year || 'N/A',
         Department: p.department,
         Email: p.email,
         Score: `${p.total_score} / ${maxScore}`,
@@ -47,6 +48,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         'Rank',
         'Name',
         'Roll Number',
+        'Year',
         'Department',
         'Email',
         'Score',
@@ -64,6 +66,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
           row.Rank,
           `"${row.Name.replace(/"/g, '""')}"`,
           `"${row['Roll Number'].replace(/"/g, '""')}"`,
+          `"${row.Year.replace(/"/g, '""')}"`,
           `"${row.Department.replace(/"/g, '""')}"`,
           `"${row.Email.replace(/"/g, '""')}"`,
           `"${row.Score}"`,
@@ -145,13 +148,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       );
 
       const tableHead = [
-        ['Rank', 'Name', 'Roll No', 'Department', 'Email', 'Score', 'Correct', 'Total Time (s)', 'Status'],
+        ['Rank', 'Name', 'Roll No', 'Year', 'Department', 'Email', 'Score', 'Correct', 'Total Time (s)', 'Status'],
       ];
 
       const tableBody = dataRows.map(r => [
         `#${r.Rank}`,
         r.Name,
         r['Roll Number'],
+        r.Year,
         r.Department,
         r.Email,
         r.Score,

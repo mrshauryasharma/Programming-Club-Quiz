@@ -27,6 +27,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         id: participant.id,
         name: participant.name,
         roll_no: participant.roll_no,
+        year: participant.year,
         department: participant.department,
         email: participant.email,
         warning_count: participant.warning_count,

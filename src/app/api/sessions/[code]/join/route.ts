@@ -6,12 +6,14 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
   try {
     const { code } = await context.params;
     const body = await req.json();
-    const { name, roll_no, department, email } = body;
+    const { name, roll_no, year, department, custom_department, email } = body;
 
     const { participant, session } = await db.joinSession(code, {
       name,
       roll_no,
+      year,
       department,
+      custom_department,
       email,
     });
 
@@ -19,6 +21,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
       participant_id: participant.id,
       name: participant.name,
       roll_no: participant.roll_no,
+      year: participant.year,
       department: participant.department,
     });
 

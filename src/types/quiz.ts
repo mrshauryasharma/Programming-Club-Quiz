@@ -55,7 +55,9 @@ export interface Participant {
   session_id: string;
   name: string;
   roll_no: string;
+  year: string; // '1st Year' | '2nd Year' | '3rd Year' | '4th Year' | '5th Year'
   department: string;
+  custom_department?: string;
   email: string;
   warning_count: number; // 0..3
   status: ParticipantStatus;

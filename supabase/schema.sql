@@ -44,7 +44,9 @@ CREATE TABLE IF NOT EXISTS session_participants (
   session_id UUID REFERENCES sessions(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
   roll_no TEXT NOT NULL,
+  year TEXT NOT NULL DEFAULT '1st Year',
   department TEXT NOT NULL,
+  custom_department TEXT,
   email TEXT NOT NULL,
   warning_count INT NOT NULL DEFAULT 0 CHECK (warning_count >= 0 AND warning_count <= 3),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'warning_1', 'warning_2', 'removed')),
@@ -53,6 +55,10 @@ CREATE TABLE IF NOT EXISTS session_participants (
   joined_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
   CONSTRAINT unique_session_participant_roll UNIQUE (session_id, roll_no)
 );
+
+-- Migration statement if updating existing table
+ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS year TEXT NOT NULL DEFAULT '1st Year';
+ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS custom_department TEXT;
 
 -- 6. Session Answers Table
 CREATE TABLE IF NOT EXISTS session_answers (

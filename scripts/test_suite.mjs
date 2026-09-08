@@ -61,20 +61,60 @@ async function runTests() {
   const { quiz } = await validQuizRes.json();
   const quizId = quiz.id;
 
-  // TEST 2: SESSION CREATION & GAME CODE
-  console.log('\nTEST 2: Session Creation & Game Code Generation');
+  // TEST 2: SESSION CREATION & DYNAMIC GAME CODE GENERATION
+  console.log('\nTEST 2: Session Creation & Dynamic Game Code Generation');
   const sessionRes = await fetch(`${BASE_URL}/api/sessions/create`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ quiz_id: quizId }),
   });
-  assert(sessionRes.ok, 'Successfully created live session');
+  assert(sessionRes.ok, 'Successfully created live session 1');
   const { session } = await sessionRes.json();
   const gameCode = session.game_code;
   assert(gameCode && gameCode.length === 6, `Generated valid 6-char Game Code: ${gameCode}`);
 
-  // TEST 3: MULTI-USER JOIN & PARTICIPANT VALIDATION
-  console.log('\nTEST 3: Multi-User Join & Validation');
+  // Test that starting the same quiz AGAIN generates a DIFFERENT Game Code
+  const sessionRes2 = await fetch(`${BASE_URL}/api/sessions/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ quiz_id: quizId }),
+  });
+  assert(sessionRes2.ok, 'Successfully created live session 2 for the same quiz');
+  const session2 = (await sessionRes2.json()).session;
+  assert(session2.game_code && session2.game_code.length === 6, `Generated valid 6-char Game Code for session 2: ${session2.game_code}`);
+  assert(session2.game_code !== gameCode, `Same quiz started again generates a DIFFERENT Game Code (${gameCode} vs ${session2.game_code})`);
+
+  // TEST 2.5: STEP 1 CODE VALIDATION ENDPOINT
+  console.log('\nTEST 2.5: Step 1 Code Validation Endpoint');
+  const invalidCodeRes = await fetch(`${BASE_URL}/api/sessions/BADCOD/validate`);
+  assert(!invalidCodeRes.ok && invalidCodeRes.status === 404, 'Step 1: Rejects invalid game code on /validate');
+  const validCodeRes = await fetch(`${BASE_URL}/api/sessions/${gameCode}/validate`);
+  assert(validCodeRes.ok, 'Step 1: Successfully validates existing game code on /validate');
+
+  // Verify that an ENDED session cannot be joined
+  await fetch(`${BASE_URL}/api/sessions/${session2.game_code}/action`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'FINAL_RESULTS' }),
+  });
+  const endedValidateRes = await fetch(`${BASE_URL}/api/sessions/${session2.game_code}/validate`);
+  assert(!endedValidateRes.ok && endedValidateRes.status === 400, 'Rejects joining a completed/ended quiz session on /validate');
+
+  const endedJoinRes = await fetch(`${BASE_URL}/api/sessions/${session2.game_code}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Late Student',
+      roll_no: '23CS999',
+      year: '1st Year',
+      department: 'School of ICT',
+      email: 'late@gbu.ac.in',
+    }),
+  });
+  assert(!endedJoinRes.ok && endedJoinRes.status === 400, 'Rejects joining a completed/ended quiz session on /join');
+
+  // TEST 3: MULTI-USER JOIN & PARTICIPANT VALIDATION (FLOW STEPS 2-4)
+  console.log('\nTEST 3: Multi-User Join & Validation (Steps 2-4: Year, Department, Info)');
   // Attempt invalid join (missing roll number)
   const invalidJoinRes = await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
     method: 'POST',
@@ -82,13 +122,55 @@ async function runTests() {
     body: JSON.stringify({
       name: 'Rahul Kumar',
       roll_no: '',
+      year: '2nd Year',
       department: 'School of ICT',
       email: 'rahul@gbu.ac.in',
     }),
   });
   assert(!invalidJoinRes.ok, 'Rejects join with missing Roll Number');
 
-  // Join Student 1: Rahul
+  // Attempt invalid join (missing year)
+  const invalidYearRes = await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Rahul Kumar',
+      roll_no: '23CS101',
+      department: 'School of ICT',
+      email: 'rahul@gbu.ac.in',
+    }),
+  });
+  assert(!invalidYearRes.ok, 'Rejects join with missing Year');
+
+  // Attempt invalid join (invalid year option)
+  const badYearRes = await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Rahul Kumar',
+      roll_no: '23CS101',
+      year: '7th Year',
+      department: 'School of ICT',
+      email: 'rahul@gbu.ac.in',
+    }),
+  });
+  assert(!badYearRes.ok, 'Rejects join with invalid Year option (must be 1st-5th Year)');
+
+  // Attempt invalid join ('Other' department without custom_department text)
+  const missingCustomDeptRes = await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name: 'Rahul Kumar',
+      roll_no: '23CS101',
+      year: '2nd Year',
+      department: 'Other',
+      email: 'rahul@gbu.ac.in',
+    }),
+  });
+  assert(!missingCustomDeptRes.ok, 'Rejects join when Department is "Other" but custom department name is blank');
+
+  // Join Student 1: Rahul (2nd Year, CSE)
   const join1 = await (
     await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
       method: 'POST',
@@ -96,15 +178,16 @@ async function runTests() {
       body: JSON.stringify({
         name: 'Rahul Kumar',
         roll_no: '23CS101',
+        year: '2nd Year',
         department: 'Department of Computer Science',
         email: 'rahul@gbu.ac.in',
       }),
     })
   ).json();
   const rahul = join1.participant;
-  assert(rahul && rahul.id, `Student 1 (Rahul) joined session`);
+  assert(rahul && rahul.id && rahul.year === '2nd Year', `Student 1 (Rahul - 2nd Year) joined session`);
 
-  // Join Student 2: Priya
+  // Join Student 2: Priya (3rd Year, IT)
   const join2 = await (
     await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
       method: 'POST',
@@ -112,15 +195,16 @@ async function runTests() {
       body: JSON.stringify({
         name: 'Priya Singh',
         roll_no: '23IT102',
+        year: '3rd Year',
         department: 'Department of Information Technology',
         email: 'priya@gbu.ac.in',
       }),
     })
   ).json();
   const priya = join2.participant;
-  assert(priya && priya.id, `Student 2 (Priya) joined session`);
+  assert(priya && priya.id && priya.year === '3rd Year', `Student 2 (Priya - 3rd Year) joined session`);
 
-  // Join Student 3: Amit
+  // Join Student 3: Amit (1st Year, Other with custom department)
   const join3 = await (
     await fetch(`${BASE_URL}/api/sessions/${gameCode}/join`, {
       method: 'POST',
@@ -128,13 +212,15 @@ async function runTests() {
       body: JSON.stringify({
         name: 'Amit Verma',
         roll_no: '23EC103',
-        department: 'Department of Electronics',
+        year: '1st Year',
+        department: 'Other',
+        custom_department: 'Robotics and Automation',
         email: 'amit@gbu.ac.in',
       }),
     })
   ).json();
   const amit = join3.participant;
-  assert(amit && amit.id, `Student 3 (Amit) joined session`);
+  assert(amit && amit.id && amit.year === '1st Year' && amit.custom_department === 'Robotics and Automation', `Student 3 (Amit - 1st Year, Custom Dept) joined session`);
 
   // Verify waiting state
   const stateLobby = await (await fetch(`${BASE_URL}/api/sessions/${gameCode}/state`)).json();
@@ -317,9 +403,9 @@ async function runTests() {
   const csvRes = await fetch(`${BASE_URL}/api/sessions/${gameCode}/export/csv`);
   assert(csvRes.ok, 'CSV export endpoint returned HTTP 200');
   const csvText = await csvRes.text();
-  assert(csvText.includes('Rank,Name,Roll Number,Department,Email,Score'), 'CSV contains correct header row');
-  assert(csvText.includes('Priya Singh') && csvText.includes('4 / 4'), 'CSV contains Priya Singh with score 4 / 4');
-  assert(csvText.includes('Rahul Kumar') && csvText.includes('2 / 4'), 'CSV contains Rahul Kumar with score 2 / 4');
+  assert(csvText.includes('Rank,Name,Roll Number,Year,Department,Email,Score'), 'CSV contains correct header row including Year');
+  assert(csvText.includes('Priya Singh') && csvText.includes('3rd Year') && csvText.includes('4 / 4'), 'CSV contains Priya Singh with 3rd Year and score 4 / 4');
+  assert(csvText.includes('Rahul Kumar') && csvText.includes('2nd Year') && csvText.includes('2 / 4'), 'CSV contains Rahul Kumar with 2nd Year and score 2 / 4');
   assert(csvText.includes('Amit Verma') && csvText.includes('REMOVED'), 'CSV records Amit Verma as REMOVED');
 
   // 2. Excel (.xlsx)

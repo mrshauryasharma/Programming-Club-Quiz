@@ -90,8 +90,24 @@ class QuizRepository {
     if (supabase) {
       const { data, error } = await supabase.from('quizzes').select('*').eq('id', id).single();
       if (!error && data) {
-        const { data: qData } = await supabase.from('questions').select('*').eq('quiz_id', id).order('order_index', { ascending: true });
-        return { ...(data as Quiz), questions: (qData as Question[]) || [] };
+        // Query existing questions table using existing columns: text, correct_option, time_limit, order_num
+        const { data: qData } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('quiz_id', id)
+          .order('order_num', { ascending: true });
+
+        const mappedQuestions: Question[] = (qData || []).map((row: any) => ({
+          id: row.id,
+          quiz_id: row.quiz_id,
+          question_text: row.text || row.question_text,
+          options: row.options || [],
+          correct_option_index: row.correct_option ?? row.correct_option_index ?? 0,
+          timer_seconds: row.time_limit ?? row.timer_seconds ?? 30,
+          order_index: row.order_num ?? row.order_index ?? 0,
+        }));
+
+        return { ...(data as Quiz), questions: mappedQuestions };
       }
     }
     const quiz = this.quizzes.get(id);
@@ -99,7 +115,66 @@ class QuizRepository {
     return { ...quiz, questions: this.questions.get(id) || [] };
   }
 
-  public async createQuiz(quiz: Omit<Quiz, 'id' | 'created_at' | 'updated_at'>, questions: Omit<Question, 'id' | 'quiz_id'>[]): Promise<Quiz> {
+  public async createQuiz(
+    quiz: Omit<Quiz, 'id' | 'created_at' | 'updated_at'>,
+    questions: Omit<Question, 'id' | 'quiz_id'>[]
+  ): Promise<Quiz> {
+    const supabase = getSupabaseServerClient();
+
+    if (supabase) {
+      try {
+        const { data: quizData, error: quizError } = await supabase
+          .from('quizzes')
+          .insert({
+            title: quiz.title,
+            description: quiz.description,
+          })
+          .select()
+          .single();
+
+        if (!quizError && quizData) {
+          const quizId = quizData.id;
+          const questionsPayload = questions.map((q, idx) => ({
+            quiz_id: quizId,
+            text: q.question_text,
+            options: q.options,
+            correct_option: q.correct_option_index,
+            points: 2, // Strictly 2 points per rule
+            time_limit: Math.min(120, Math.max(10, q.timer_seconds)),
+            order_num: idx,
+            question_type: 'MCQ',
+          }));
+
+          const { data: qResult } = await supabase.from('questions').insert(questionsPayload).select();
+
+          const mappedQuestions: Question[] = (qResult || []).map((row: any) => ({
+            id: row.id,
+            quiz_id: quizId,
+            question_text: row.text,
+            options: row.options,
+            correct_option_index: row.correct_option,
+            timer_seconds: row.time_limit,
+            order_index: row.order_num,
+          }));
+
+          const fullQuiz: Quiz = {
+            id: quizId,
+            title: quizData.title,
+            description: quizData.description,
+            created_at: quizData.created_at,
+            updated_at: quizData.updated_at,
+            questions: mappedQuestions,
+          };
+
+          this.quizzes.set(quizId, fullQuiz);
+          this.questions.set(quizId, mappedQuestions);
+          return fullQuiz;
+        }
+      } catch (err) {
+        console.warn('Supabase createQuiz fallback to in-memory:', err);
+      }
+    }
+
     const id = `quiz-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const newQuiz: Quiz = {
       ...quiz,
@@ -117,32 +192,6 @@ class QuizRepository {
     }));
     this.questions.set(id, questionList);
 
-    const supabase = getSupabaseServerClient();
-    if (supabase) {
-      try {
-        await supabase.from('quizzes').insert({
-          id,
-          title: newQuiz.title,
-          description: newQuiz.description,
-          created_at: newQuiz.created_at,
-          updated_at: newQuiz.updated_at,
-        });
-        await supabase.from('questions').insert(
-          questionList.map(q => ({
-            id: q.id,
-            quiz_id: id,
-            question_text: q.question_text,
-            options: q.options,
-            correct_option_index: q.correct_option_index,
-            timer_seconds: q.timer_seconds,
-            order_index: q.order_index,
-          }))
-        );
-      } catch (err) {
-        console.warn('Supabase insert warning, fallback retained in-memory:', err);
-      }
-    }
-
     return { ...newQuiz, questions: questionList };
   }
 
@@ -156,18 +205,86 @@ class QuizRepository {
     return true;
   }
 
-  // Session Management
+  // Session Management — Every live session gets a newly generated 6-char Game Code
   public async createSession(quizId: string): Promise<Session> {
     const quiz = await this.getQuizById(quizId);
     if (!quiz) throw new Error('Quiz not found');
 
-    // Generate unique 6-character alphanumeric game code (uppercase)
+    const supabase = getSupabaseServerClient();
+
+    // Server-side generation of unique 6-character uppercase alphanumeric code
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let gameCode = '';
-    for (let i = 0; i < 6; i++) {
-      gameCode += chars.charAt(Math.floor(Math.random() * chars.length));
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 10) {
+      attempts++;
+      gameCode = '';
+      for (let i = 0; i < 6; i++) {
+        gameCode += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      const localExists = this.sessions.has(gameCode);
+      if (localExists) continue;
+
+      if (supabase) {
+        const { data } = await supabase
+          .from('live_sessions')
+          .select('id')
+          .eq('game_code', gameCode)
+          .in('status', ['WAITING', 'ACTIVE', 'waiting', 'active']);
+        if (data && data.length > 0) continue;
+      }
+
+      isUnique = true;
     }
 
+    if (!isUnique) {
+      gameCode = `S${Date.now().toString().slice(-5)}`;
+    }
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('live_sessions')
+          .insert({
+            quiz_id: quizId,
+            game_code: gameCode,
+            status: 'WAITING',
+            current_state: 'WAITING',
+            current_question_index: 0,
+            question_start_time: null,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          const session: Session = {
+            id: data.id,
+            quiz_id: data.quiz_id,
+            game_code: data.game_code,
+            status: (data.status?.toLowerCase() || 'waiting') as any,
+            current_question_index: data.current_question_index || 0,
+            question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
+            current_state: (data.current_state || 'WAITING') as any,
+            created_at: data.created_at,
+            ended_at: data.ended_at,
+          };
+
+          this.sessions.set(session.id, session);
+          this.sessions.set(gameCode, session);
+          this.participants.set(session.id, []);
+          this.answers.set(session.id, []);
+          this.securityLogs.set(session.id, []);
+          return session;
+        }
+      } catch (e) {
+        console.warn('Supabase session insert fallback to in-memory:', e);
+      }
+    }
+
+    // In-memory fallback
     const session: Session = {
       id: `sess-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       quiz_id: quizId,
@@ -181,28 +298,10 @@ class QuizRepository {
     };
 
     this.sessions.set(session.id, session);
-    this.sessions.set(gameCode, session); // Index by code as well
+    this.sessions.set(gameCode, session);
     this.participants.set(session.id, []);
     this.answers.set(session.id, []);
     this.securityLogs.set(session.id, []);
-
-    const supabase = getSupabaseServerClient();
-    if (supabase) {
-      try {
-        await supabase.from('sessions').insert({
-          id: session.id,
-          quiz_id: session.quiz_id,
-          game_code: session.game_code,
-          status: session.status,
-          current_question_index: session.current_question_index,
-          question_start_time: session.question_start_time,
-          current_state: session.current_state,
-          created_at: session.created_at,
-        });
-      } catch (e) {
-        console.warn('Supabase session insert warning:', e);
-      }
-    }
 
     return session;
   }
@@ -214,11 +313,22 @@ class QuizRepository {
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data } = await supabase.from('sessions').select('*').eq('game_code', normalizedCode).single();
+      const { data } = await supabase.from('live_sessions').select('*').eq('game_code', normalizedCode).single();
       if (data) {
-        this.sessions.set(data.id, data as Session);
-        this.sessions.set(normalizedCode, data as Session);
-        return data as Session;
+        const s: Session = {
+          id: data.id,
+          quiz_id: data.quiz_id,
+          game_code: data.game_code,
+          status: (data.status?.toLowerCase() || 'waiting') as any,
+          current_question_index: data.current_question_index || 0,
+          question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
+          current_state: (data.current_state || 'WAITING') as any,
+          created_at: data.created_at,
+          ended_at: data.ended_at,
+        };
+        this.sessions.set(s.id, s);
+        this.sessions.set(normalizedCode, s);
+        return s;
       }
     }
     return null;
@@ -229,8 +339,21 @@ class QuizRepository {
     if (session) return session;
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data } = await supabase.from('sessions').select('*').eq('id', id).single();
-      if (data) return data as Session;
+      const { data } = await supabase.from('live_sessions').select('*').eq('id', id).single();
+      if (data) {
+        const s: Session = {
+          id: data.id,
+          quiz_id: data.quiz_id,
+          game_code: data.game_code,
+          status: (data.status?.toLowerCase() || 'waiting') as any,
+          current_question_index: data.current_question_index || 0,
+          question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
+          current_state: (data.current_state || 'WAITING') as any,
+          created_at: data.created_at,
+          ended_at: data.ended_at,
+        };
+        return s;
+      }
     }
     return null;
   }
@@ -238,26 +361,51 @@ class QuizRepository {
   // Participant Join
   public async joinSession(
     code: string,
-    participantData: { name: string; roll_no: string; department: string; email: string }
+    participantData: {
+      name: string;
+      roll_no: string;
+      year: string;
+      department: string;
+      custom_department?: string;
+      email: string;
+    }
   ): Promise<{ participant: Participant; session: Session }> {
     const session = await this.getSessionByCode(code);
     if (!session) throw new Error('Invalid game code');
     if (session.status === 'completed') throw new Error('This quiz session has already ended');
 
-    const cleanRoll = participantData.roll_no.trim().toUpperCase();
-    const cleanName = participantData.name.trim();
-    const cleanEmail = participantData.email.trim().toLowerCase();
-    const cleanDept = participantData.department.trim();
+    const cleanRoll = participantData.roll_no?.trim().toUpperCase();
+    const cleanName = participantData.name?.trim();
+    const cleanEmail = participantData.email?.trim().toLowerCase();
+    const cleanYear = participantData.year?.trim();
+    let cleanDept = participantData.department?.trim();
+    const cleanCustomDept = participantData.custom_department?.trim();
+
+    const validYears = ['1st Year', '2nd Year', '3rd Year', '4th Year', '5th Year'];
+    if (!cleanYear || !validYears.includes(cleanYear)) {
+      throw new Error('Please select a valid Year of study (1st, 2nd, 3rd, 4th, or 5th Year)');
+    }
+
+    if (!cleanDept) {
+      throw new Error('Department is required');
+    }
+
+    if (cleanDept === 'Other') {
+      if (!cleanCustomDept) {
+        throw new Error('Please enter your department name');
+      }
+      cleanDept = cleanCustomDept;
+    }
 
     if (!cleanName) throw new Error('Name is required');
     if (!cleanRoll) throw new Error('Roll Number is required');
-    if (!cleanDept) throw new Error('Department is required');
     if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('A valid Email ID is required');
 
-    let pList = this.participants.get(session.id) || [];
+    // Fetch existing participants in THIS active session
+    let pList = await this.getParticipants(session.id);
 
-    // Check duplicate roll number in session
-    const existing = pList.find(p => p.roll_no.toUpperCase() === cleanRoll);
+    // Roll number uniqueness enforced strictly WITHIN this session
+    const existing = pList.find(p => p.roll_no?.toUpperCase() === cleanRoll);
     if (existing) {
       if (existing.status === 'removed') {
         throw new Error('This participant has been removed from this session for cheating violations');
@@ -265,12 +413,65 @@ class QuizRepository {
       return { participant: existing, session };
     }
 
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('participants')
+          .insert({
+            session_id: session.id,
+            name: cleanName,
+            nickname: cleanName, // Compatibility with legacy schema
+            roll_no: cleanRoll,
+            year: cleanYear,
+            department: cleanDept,
+            custom_department: cleanCustomDept || '',
+            email: cleanEmail,
+            warning_count: 0,
+            status: 'ACTIVE',
+            score: 0,
+            correct_count: 0,
+            total_response_time_ms: 0,
+          })
+          .select()
+          .single();
+
+        if (!error && data) {
+          const participant: Participant = {
+            id: data.id,
+            session_id: session.id,
+            name: cleanName,
+            roll_no: cleanRoll,
+            year: cleanYear,
+            department: cleanDept,
+            custom_department: cleanCustomDept || '',
+            email: cleanEmail,
+            warning_count: 0,
+            status: 'active',
+            total_score: 0,
+            total_response_time_ms: 0,
+            joined_at: data.joined_at,
+          };
+
+          const curList = this.participants.get(session.id) || [];
+          curList.push(participant);
+          this.participants.set(session.id, curList);
+          return { participant, session };
+        }
+      } catch (e) {
+        console.warn('Supabase joinSession fallback to in-memory:', e);
+      }
+    }
+
+    // In-memory fallback
     const participant: Participant = {
       id: `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       session_id: session.id,
       name: cleanName,
       roll_no: cleanRoll,
+      year: cleanYear,
       department: cleanDept,
+      custom_department: cleanCustomDept || '',
       email: cleanEmail,
       warning_count: 0,
       status: 'active',
@@ -279,17 +480,9 @@ class QuizRepository {
       joined_at: new Date().toISOString(),
     };
 
-    pList.push(participant);
-    this.participants.set(session.id, pList);
-
-    const supabase = getSupabaseServerClient();
-    if (supabase) {
-      try {
-        await supabase.from('session_participants').insert(participant);
-      } catch (e) {
-        console.warn('Supabase participant insert warning:', e);
-      }
-    }
+    const curList = this.participants.get(session.id) || [];
+    curList.push(participant);
+    this.participants.set(session.id, curList);
 
     return { participant, session };
   }
@@ -297,8 +490,24 @@ class QuizRepository {
   public async getParticipants(sessionId: string): Promise<Participant[]> {
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data } = await supabase.from('session_participants').select('*').eq('session_id', sessionId);
-      if (data && data.length > 0) return data as Participant[];
+      const { data } = await supabase.from('participants').select('*').eq('session_id', sessionId);
+      if (data && data.length > 0) {
+        return data.map((p: any) => ({
+          id: p.id,
+          session_id: p.session_id,
+          name: p.name || p.nickname || 'Student',
+          roll_no: p.roll_no || 'N/A',
+          year: p.year || '1st Year',
+          department: p.department || 'School of ICT',
+          custom_department: p.custom_department || '',
+          email: p.email || 'student@gbu.ac.in',
+          warning_count: p.warning_count || 0,
+          status: (p.status?.toLowerCase() || 'active') as any,
+          total_score: p.score ?? p.total_score ?? 0,
+          total_response_time_ms: Number(p.total_response_time_ms || 0),
+          joined_at: p.joined_at,
+        }));
+      }
     }
     return this.participants.get(sessionId) || [];
   }
@@ -371,9 +580,9 @@ class QuizRepository {
     if (supabase) {
       try {
         await supabase
-          .from('sessions')
+          .from('live_sessions')
           .update({
-            status: session.status,
+            status: session.status === 'completed' ? 'ENDED' : 'ACTIVE',
             current_question_index: session.current_question_index,
             question_start_time: session.question_start_time,
             current_state: session.current_state,
@@ -459,12 +668,26 @@ class QuizRepository {
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
-        await supabase.from('session_answers').insert(answerRecord);
+        // Insert into existing answers table: points_awarded, speed_bonus: 0, streak_bonus: 0, response_time_ms
+        await supabase.from('answers').insert({
+          session_id: session.id,
+          participant_id: participantId,
+          question_id: questionId,
+          selected_option: selectedOption,
+          is_correct,
+          points_awarded: points,
+          speed_bonus: 0,
+          streak_bonus: 0,
+          response_time_ms,
+        });
+
+        // Update existing participants table: score, total_response_time_ms
         await supabase
-          .from('session_participants')
+          .from('participants')
           .update({
-            total_score: participant.total_score,
+            score: participant.total_score,
             total_response_time_ms: participant.total_response_time_ms,
+            correct_count: Math.floor(participant.total_score / 2),
           })
           .eq('id', participantId);
       } catch (e) {
@@ -522,14 +745,29 @@ class QuizRepository {
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
+        const dbStatus =
+          participant.status === 'warning_1'
+            ? 'WARNING_1'
+            : participant.status === 'warning_2'
+            ? 'WARNING_2'
+            : participant.status === 'removed'
+            ? 'REMOVED'
+            : 'ACTIVE';
+
         await supabase
-          .from('session_participants')
+          .from('participants')
           .update({
             warning_count: participant.warning_count,
-            status: participant.status,
+            status: dbStatus,
           })
           .eq('id', participantId);
-        await supabase.from('security_logs').insert(log);
+
+        await supabase.from('security_logs').insert({
+          session_id: session.id,
+          participant_id: participantId,
+          violation_type: violationType,
+          warning_level: participant.warning_count,
+        });
       } catch (e) {
         console.warn('Supabase violation logging warning:', e);
       }

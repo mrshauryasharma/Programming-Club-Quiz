@@ -58,6 +58,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         id: p.id,
         name: p.name,
         roll_no: p.roll_no,
+        year: p.year,
         department: p.department,
         status: p.status,
         warning_count: p.warning_count,
