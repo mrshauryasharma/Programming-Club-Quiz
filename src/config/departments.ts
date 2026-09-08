@@ -1,19 +1,38 @@
 /**
  * PROGRAMMING CLUB QUIZ — OFFICIAL DEPARTMENTS CONFIGURATION
  *
- * NOTE: The official 27 department names for Gautam Buddha University / SOICT
- * will be inserted into the OFFICIAL_DEPARTMENTS array below.
- *
- * DO NOT add fake or fabricated department names.
- * When the official list is received, paste the 27 strings into this array.
+ * Official 27 department programs for Gautam Buddha University (SOICT).
+ * Sourced from official university department offerings.
  */
 
 export const OFFICIAL_DEPARTMENTS: string[] = [
-  // INSERT OFFICIAL 27 DEPARTMENT NAMES HERE:
-  // e.g.:
-  // "Department of Computer Science and Engineering",
-  // "Department of Information Technology",
-  // ...
+  'B.Tech CSE',
+  'B.Tech CSE AI',
+  'B.Tech CSE Cyber Security',
+  'B.Tech CSE Data Science',
+  'B.Tech ECE',
+  'B.Tech ECE(AI & ML)',
+  'B.Tech ECE(VLSI)',
+  'B.Tech IT',
+  'B.Tech DS & ML',
+  'Integrated B.Tech-M.Tech CSE',
+  'Integrated B.Tech-M.Tech CSE AI and Robotics',
+  'Integrated B.Tech-M.Tech CSE SE',
+  'Integrated B.Tech-M.Tech CSE DS',
+  'Integrated B.Tech-M.Tech ECE',
+  'Integrated B.Tech-M.Tech ECE AI and Robotics',
+  'Integrated B.Tech-M.Tech ECE VLSI Design',
+  'Integrated B.Tech-M.Tech ECE WCN',
+  'BCA',
+  'BCA (AI & ML)',
+  'MCA',
+  'M.Tech CSE',
+  'M.Tech CSE (SE)',
+  'M.Tech CSE (AI & Robotics)',
+  'M.Tech CSE (DS)',
+  'Ph.D CSE',
+  'Ph.D ECE',
+  'Ph.D IT',
 ];
 
 /**
