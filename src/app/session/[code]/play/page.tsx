@@ -6,19 +6,15 @@ import Image from 'next/image';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import {
-  Wifi,
   WifiOff,
   Maximize2,
   Minimize2,
   AlertTriangle,
   Ban,
   CheckCircle2,
-  XCircle,
-  Trophy,
   Clock,
   Award,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 export default function ParticipantPlayPage() {
   const params = useParams();
@@ -38,11 +34,10 @@ export default function ParticipantPlayPage() {
   // Submission & Local state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [lastAnswerResult, setLastAnswerResult] = useState<{
-    points: number;
-    is_correct: boolean;
-    response_time_ms: number;
-  } | null>(null);
+  // localQuestionIndex: per-participant question position that advances immediately on submit
+  // -1 means "follow the server state" (before any submission on this question)
+  const [localQuestionIndex, setLocalQuestionIndex] = useState<number>(-1);
+  const [showCompletionScreen, setShowCompletionScreen] = useState(false);
 
   // Anti-Cheat & Warning state
   const [warningCount, setWarningCount] = useState(0);
@@ -199,17 +194,23 @@ export default function ParticipantPlayPage() {
       setQuestionSummary(data.questionSummary);
       if (data.leaderboard) setLeaderboard(data.leaderboard);
 
-      // Reset submission state when moving to a new active question
+      // Reset submission state when the server starts a new active question
       if (data.session.current_state === 'QUESTION_ACTIVE') {
+        const serverQIndex = data.session.current_question_index;
         const qId = data.activeQuestion?.id;
         const currentAnsweredQId = sessionStorage.getItem(`pc_ans_${code}_${qId}`);
         if (currentAnsweredQId) {
+          // Already answered this question in a previous session restore — mark submitted
           setSubmitted(true);
-        } else {
+        } else if (localQuestionIndex === -1 || localQuestionIndex === serverQIndex) {
+          // Server is on a question we haven't answered yet — reset for fresh answering
           setSubmitted(false);
           setSelectedOption(null);
-          setLastAnswerResult(null);
+          // Reset localQuestionIndex so we track the server's current question
+          setLocalQuestionIndex(-1);
         }
+        // If localQuestionIndex > serverQIndex: participant has already submitted and
+        // is locally "ahead" waiting for server to catch up — do NOT reset their state.
 
         // Sync local timer with remaining ms from server
         if (data.activeQuestion?.remaining_ms !== undefined) {
@@ -226,15 +227,15 @@ export default function ParticipantPlayPage() {
         }
       }
 
-      // Trigger confetti on final results for winners
-      if (data.session.current_state === 'FINAL_RESULTS' && data.leaderboard) {
-        const topRank = data.leaderboard.find((p: any) => p.id === participantId)?.rank;
-        if (topRank && topRank <= 3) {
-          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        }
+      // When session reaches FINAL_RESULTS or COMPLETED, show neutral completion
+      if (
+        data.session.current_state === 'FINAL_RESULTS' ||
+        data.session.current_state === 'COMPLETED'
+      ) {
+        setShowCompletionScreen(true);
       }
     } catch (e) {}
-  }, [code, participantId]);
+  }, [code, participantId, localQuestionIndex]);
 
   useEffect(() => {
     fetchCurrentState();
@@ -302,16 +303,17 @@ export default function ParticipantPlayPage() {
     };
   }, [sessionState?.current_state]);
 
-  // Submit Answer handler
+  // Submit Answer handler — immediately advances participant to next question on success
   const handleOptionSelect = async (index: number) => {
     if (submitted || isRemoved || sessionState?.current_state !== 'QUESTION_ACTIVE') return;
+    if (!activeQuestion?.id) return;
 
+    // Record selection and lock options immediately for responsiveness
     setSelectedOption(index);
     setSubmitted(true);
 
-    if (activeQuestion?.id) {
-      sessionStorage.setItem(`pc_ans_${code}_${activeQuestion.id}`, `${index}`);
-    }
+    // Persist to sessionStorage so refresh/reconnect knows this question was answered
+    sessionStorage.setItem(`pc_ans_${code}_${activeQuestion.id}`, `${index}`);
 
     try {
       const res = await fetch(`/api/sessions/${code}/submit-answer`, {
@@ -324,15 +326,37 @@ export default function ParticipantPlayPage() {
         }),
       });
 
-      const data = await res.json();
       if (res.ok) {
-        setLastAnswerResult({
-          points: data.points,
-          is_correct: data.is_correct,
-          response_time_ms: data.response_time_ms,
-        });
+        // Answer persisted on server — advance participant to next question immediately.
+        // Do NOT read or display is_correct / points from the response.
+        const currentIndex = activeQuestion.order_index; // 0-based
+        const totalQuestions = activeQuestion.total_questions;
+
+        if (currentIndex + 1 >= totalQuestions) {
+          // This was the final question — show neutral completion screen
+          setShowCompletionScreen(true);
+        } else {
+          // Immediately show "Waiting for next question" screen
+          // Set localQuestionIndex to the NEXT index so fetchCurrentState won't reset
+          // our submitted state when the server is still on the same question
+          setLocalQuestionIndex(currentIndex + 1);
+          // Reset for next question display
+          setSelectedOption(null);
+          setSubmitted(false);
+        }
+      } else {
+        // Server rejected the answer (e.g. time expired) — revert to unsubmitted
+        setSubmitted(false);
+        setSelectedOption(null);
+        sessionStorage.removeItem(`pc_ans_${code}_${activeQuestion.id}`);
+        const errData = await res.json().catch(() => ({}));
+        console.warn('Answer rejected by server:', errData.error || res.status);
       }
     } catch (err) {
+      // Network error — revert; participant can retry
+      setSubmitted(false);
+      setSelectedOption(null);
+      sessionStorage.removeItem(`pc_ans_${code}_${activeQuestion.id}`);
       console.warn('Error submitting answer:', err);
     }
   };
@@ -450,23 +474,57 @@ export default function ParticipantPlayPage() {
 
       {/* Dynamic State View Container */}
       <div className="w-full max-w-2xl mx-auto my-auto py-4">
+
         {/* -------------------------------------------------------- */}
-        {/* 1. STATE: WAITING FOR ORGANIZER */}
+        {/* COMPLETION SCREEN — shown immediately after final question submit */}
+        {/* OR when server reaches FINAL_RESULTS/COMPLETED state           */}
         {/* -------------------------------------------------------- */}
-        {sessionState?.current_state === 'WAITING' && (
+        {showCompletionScreen && (
+          <div className="p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-brand-purple/15 text-brand-purple flex items-center justify-center mb-4 border border-brand-purple/30">
+              <Award className="w-9 h-9" />
+            </div>
+            <h2 className="text-2xl font-black text-brand-navy dark:text-white">Quiz Completed!</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
+              Your answers have been recorded.
+            </p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              Please wait for the Organizer to reveal the final results.
+            </p>
+            <div className="mt-6 w-8 h-8 border-2 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto" />
+          </div>
+        )}
+
+        {/* -------------------------------------------------------- */}
+        {/* 1. WAITING FOR ORGANIZER TO START / BETWEEN QUESTIONS    */}
+        {/* Also shown when participant has just submitted and is     */}
+        {/* waiting for the server to advance to the next question   */}
+        {/* -------------------------------------------------------- */}
+        {!showCompletionScreen && (
+          sessionState?.current_state === 'WAITING' ||
+          (sessionState?.current_state === 'QUESTION_ACTIVE' && localQuestionIndex > (sessionState?.current_question_index ?? -1)) ||
+          sessionState?.current_state === 'QUESTION_ENDED' ||
+          sessionState?.current_state === 'SHOW_LEADERBOARD'
+        ) && (
           <div className="text-center p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
-            <div className="w-12 h-12 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-bold">Waiting for next question...</h2>
+            <div className="w-12 h-12 border-2 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-brand-navy dark:text-white">Waiting for next question...</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Organizer will start the question shortly.
+              {sessionState?.current_state === 'WAITING'
+                ? 'Organizer will start the question shortly.'
+                : 'Your answer has been recorded. The next question is coming up.'}
             </p>
           </div>
         )}
 
         {/* -------------------------------------------------------- */}
-        {/* 2. STATE: QUESTION ACTIVE */}
+        {/* 2. QUESTION ACTIVE — only shown when participant has NOT  */}
+        {/* yet submitted for the current server question index       */}
         {/* -------------------------------------------------------- */}
-        {sessionState?.current_state === 'QUESTION_ACTIVE' && activeQuestion && (
+        {!showCompletionScreen &&
+          sessionState?.current_state === 'QUESTION_ACTIVE' &&
+          activeQuestion &&
+          localQuestionIndex <= (sessionState?.current_question_index ?? 0) && (
           <div className="space-y-4">
             {/* Question Progress & Timer Bar */}
             <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
@@ -494,7 +552,7 @@ export default function ParticipantPlayPage() {
               </h2>
             </div>
 
-            {/* MCQ Answer Options */}
+            {/* MCQ Answer Options — hidden/locked once submitted */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {activeQuestion.options.map((option: string, idx: number) => {
                 const isSelected = selectedOption === idx;
@@ -528,180 +586,34 @@ export default function ParticipantPlayPage() {
               })}
             </div>
 
-            {/* Submission confirmation note */}
+            {/* Submission confirmation — neutral, no correctness info */}
             {submitted && (
               <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs text-center font-semibold flex items-center justify-center gap-2">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Answer Submitted! Results will display when the timer ends.</span>
+                <span>Answer submitted! Waiting for server confirmation...</span>
               </div>
             )}
           </div>
         )}
 
         {/* -------------------------------------------------------- */}
-        {/* 3. STATE: QUESTION ENDED / RESULT DISPLAY */}
+        {/* FINAL RESULTS STATE — neutral completion (no scores      */}
+        {/* revealed here; Organizer/Projector handle that flow)     */}
         {/* -------------------------------------------------------- */}
-        {sessionState?.current_state === 'QUESTION_ENDED' && (
-          <div className="space-y-4">
-            <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl text-center">
-              {lastAnswerResult ? (
-                <div>
-                  <div
-                    className={`w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-3 ${
-                      lastAnswerResult.is_correct
-                        ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-400'
-                        : 'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border border-rose-400'
-                    }`}
-                  >
-                    {lastAnswerResult.is_correct ? (
-                      <CheckCircle2 className="w-9 h-9" />
-                    ) : (
-                      <XCircle className="w-9 h-9" />
-                    )}
-                  </div>
-
-                  <h3 className="text-2xl font-black">
-                    {lastAnswerResult.is_correct ? 'CORRECT ANSWER!' : 'INCORRECT ANSWER'}
-                  </h3>
-
-                  {/* Absolute scoring display */}
-                  <div className="inline-flex items-center gap-2 mt-3 px-4 py-1.5 rounded-full text-sm font-extrabold bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple">
-                    <span>{lastAnswerResult.is_correct ? '+2 Points' : '+0 Points'}</span>
-                    <span>•</span>
-                    <span>{(lastAnswerResult.response_time_ms / 1000).toFixed(2)} sec</span>
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div className="w-16 h-16 mx-auto rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 mb-3">
-                    <Clock className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-xl font-bold">Time Expired / No Answer</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">+0 Points</p>
-                </div>
-              )}
-
-              {/* Reveal Correct Answer */}
-              {activeQuestion && activeQuestion.correct_option_index !== undefined && (
-                <div className="mt-5 p-3.5 rounded-xl bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark text-xs text-left">
-                  <span className="font-semibold text-slate-500 dark:text-slate-400">Correct Answer:</span>
-                  <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm mt-0.5">
-                    {activeQuestion.options[activeQuestion.correct_option_index]}
-                  </p>
-                </div>
-              )}
+        {!showCompletionScreen &&
+          (sessionState?.current_state === 'FINAL_RESULTS' ||
+            sessionState?.current_state === 'COMPLETED') && (
+          <div className="p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-brand-purple/15 text-brand-purple flex items-center justify-center mb-4 border border-brand-purple/30">
+              <Award className="w-9 h-9" />
             </div>
-
-            <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-              Organizer will transition to leaderboard or next question shortly...
+            <h2 className="text-2xl font-black text-brand-navy dark:text-white">Quiz Completed!</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
+              Your answers have been recorded.
             </p>
-          </div>
-        )}
-
-        {/* -------------------------------------------------------- */}
-        {/* 4. STATE: LEADERBOARD */}
-        {/* -------------------------------------------------------- */}
-        {sessionState?.current_state === 'SHOW_LEADERBOARD' && (
-          <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-amber-500" />
-                <h3 className="text-lg font-bold">Current Leaderboard</h3>
-              </div>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                Tie-broken by total response time
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              {leaderboard.slice(0, 10).map((p: any, idx: number) => {
-                const isMe = p.id === participantId;
-                return (
-                  <div
-                    key={p.id}
-                    className={`flex items-center justify-between p-3 rounded-xl text-xs font-semibold transition-all ${
-                      isMe
-                        ? 'bg-brand-purple/15 text-brand-purple border border-brand-purple/40 font-bold'
-                        : 'bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`w-6 h-6 rounded-md flex items-center justify-center font-mono font-bold ${
-                          idx === 0
-                            ? 'bg-amber-400 text-slate-900'
-                            : idx === 1
-                            ? 'bg-slate-300 text-slate-900'
-                            : idx === 2
-                            ? 'bg-amber-700 text-white'
-                            : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                        }`}
-                      >
-                        {idx + 1}
-                      </span>
-                      <span className="truncate max-w-[140px] sm:max-w-[200px]">
-                        {p.name} {isMe && '(You)'}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="text-slate-500 dark:text-slate-400 font-mono">
-                        {(p.total_response_time_ms / 1000).toFixed(1)}s
-                      </span>
-                      <span className="font-extrabold text-brand-purple text-sm">{p.total_score} pts</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* -------------------------------------------------------- */}
-        {/* 5. STATE: FINAL RESULTS */}
-        {/* -------------------------------------------------------- */}
-        {(sessionState?.current_state === 'FINAL_RESULTS' || sessionState?.current_state === 'COMPLETED') && (
-          <div className="p-6 sm:p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-amber-400/20 text-amber-500 flex items-center justify-center mb-4">
-              <Award className="w-10 h-10" />
-            </div>
-            <h2 className="text-2xl font-black">Quiz Completed!</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              Thank you for participating with the USICT GBU Programming Club.
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+              Please wait for the Organizer to reveal the final results.
             </p>
-
-            {/* Participant Personal Final Score */}
-            {(() => {
-              const me = leaderboard.find((p: any) => p.id === participantId);
-              if (!me) return null;
-              const totalQ = activeQuestion?.total_questions || 5;
-              const maxPts = totalQ * 2;
-
-              return (
-                <div className="my-6 p-5 rounded-2xl bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark">
-                  <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Your Final Score</span>
-                  <div className="text-3xl font-black text-brand-purple mt-1">
-                    {me.total_score} / {maxPts} Points
-                  </div>
-                  <div className="mt-3 flex items-center justify-center gap-4 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                    <div>
-                      Rank: <span className="text-brand-purple font-bold">#{me.rank}</span>
-                    </div>
-                    <div>•</div>
-                    <div>
-                      Total Time: <span className="font-mono">{(me.total_response_time_ms / 1000).toFixed(2)}s</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <button
-              onClick={() => router.push('/')}
-              className="mt-2 py-3 px-6 rounded-xl font-bold text-xs bg-brand-purple text-white shadow-md hover:bg-[#6A1694] transition-colors"
-            >
-              Exit Quiz
-            </button>
           </div>
         )}
       </div>
