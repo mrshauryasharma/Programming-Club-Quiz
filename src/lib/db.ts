@@ -15,7 +15,7 @@ class QuizRepository {
   }
 
   private seedDefaultQuiz() {
-    const defaultQuizId = 'default-quiz-101';
+    const defaultQuizId = 'b4722af8-2981-48e7-9c9e-4eac6bebe147';
     const defaultQuiz: Quiz = {
       id: defaultQuizId,
       title: 'Programming Club — Web & Core CS Quiz',
