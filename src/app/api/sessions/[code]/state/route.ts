@@ -56,6 +56,15 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       leaderboard = await db.getLeaderboard(session.id);
     }
 
+    const sanitizedQuestions = (quiz?.questions || []).map((q, idx) => ({
+      id: q.id,
+      question_text: q.question_text,
+      options: q.options,
+      timer_seconds: q.timer_seconds,
+      order_index: idx,
+      total_questions: quiz?.questions?.length || 0,
+    }));
+
     return NextResponse.json({
       session,
       quiz_title: quiz?.title || 'Programming Club Quiz',
@@ -72,6 +81,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         total_score: p.total_score,
       })),
       activeQuestion,
+      questions: sanitizedQuestions,
       questionSummary,
       leaderboard,
     });

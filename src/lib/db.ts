@@ -669,19 +669,13 @@ class QuizRepository {
     const quiz = await this.getQuizById(session.quiz_id);
     if (!quiz || !quiz.questions) throw new Error('Quiz not found');
 
-    const currentQuestion = quiz.questions[session.current_question_index];
-    if (!currentQuestion || currentQuestion.id !== questionId) {
-      throw new Error('Question mismatch or already expired');
+    const targetQuestion = quiz.questions.find(q => q.id === questionId);
+    if (!targetQuestion) {
+      throw new Error('Question not found in this quiz');
     }
 
     const now = Date.now();
     const startTime = session.question_start_time || now;
-    const timeLimitMs = currentQuestion.timer_seconds * 1000;
-
-    // Strict timer check: NO arbitrary grace period
-    if (now > startTime + timeLimitMs) {
-      throw new Error('Time expired. Late submissions are not accepted.');
-    }
 
     const participant = await this.getParticipantById(session.id, participantId);
     if (!participant) throw new Error('Participant not found');
@@ -698,7 +692,7 @@ class QuizRepository {
     }
 
     const response_time_ms = Math.max(0, now - startTime);
-    const is_correct = selectedOption === currentQuestion.correct_option_index;
+    const is_correct = selectedOption === targetQuestion.correct_option_index;
     const points = is_correct ? 2 : 0; // Strict scoring rule: +2 or 0
 
     const answerRecord: Answer = {

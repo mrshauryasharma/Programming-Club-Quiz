@@ -34,9 +34,8 @@ export default function ParticipantPlayPage() {
   // Submission & Local state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  // localQuestionIndex: per-participant question position that advances immediately on submit
-  // -1 means "follow the server state" (before any submission on this question)
-  const [localQuestionIndex, setLocalQuestionIndex] = useState<number>(-1);
+  const [questionsList, setQuestionsList] = useState<any[]>([]);
+  const [myQuestionIndex, setMyQuestionIndex] = useState<number>(0);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
 
   // Anti-Cheat & Warning state
@@ -194,28 +193,28 @@ export default function ParticipantPlayPage() {
       setQuestionSummary(data.questionSummary);
       if (data.leaderboard) setLeaderboard(data.leaderboard);
 
-      // Reset submission state when the server starts a new active question
-      if (data.session.current_state === 'QUESTION_ACTIVE') {
-        const serverQIndex = data.session.current_question_index;
-        const qId = data.activeQuestion?.id;
-        const currentAnsweredQId = sessionStorage.getItem(`pc_ans_${code}_${qId}`);
-        if (currentAnsweredQId) {
-          // Already answered this question in a previous session restore — mark submitted
-          setSubmitted(true);
-        } else if (localQuestionIndex === -1 || localQuestionIndex === serverQIndex) {
-          // Server is on a question we haven't answered yet — reset for fresh answering
-          setSubmitted(false);
-          setSelectedOption(null);
-          // Reset localQuestionIndex so we track the server's current question
-          setLocalQuestionIndex(-1);
-        }
-        // If localQuestionIndex > serverQIndex: participant has already submitted and
-        // is locally "ahead" waiting for server to catch up — do NOT reset their state.
-
-        // Sync local timer with remaining ms from server
-        if (data.activeQuestion?.remaining_ms !== undefined) {
-          setTimerRemainingSec(Math.ceil(data.activeQuestion.remaining_ms / 1000));
-        }
+      // Load questions array from server
+      if (data.questions && data.questions.length > 0) {
+        setQuestionsList((prev) => {
+          if (prev.length === 0) {
+            let restoreIndex = 0;
+            for (let i = 0; i < data.questions.length; i++) {
+              const q = data.questions[i];
+              if (sessionStorage.getItem(`pc_ans_${code}_${q.id}`)) {
+                restoreIndex = i + 1;
+              } else {
+                break;
+              }
+            }
+            if (restoreIndex >= data.questions.length) {
+              setShowCompletionScreen(true);
+            } else {
+              setMyQuestionIndex(restoreIndex);
+              setTimerRemainingSec(data.questions[restoreIndex]?.timer_seconds || 30);
+            }
+          }
+          return data.questions;
+        });
       }
 
       // Check if this participant was removed
@@ -235,7 +234,7 @@ export default function ParticipantPlayPage() {
         setShowCompletionScreen(true);
       }
     } catch (e) {}
-  }, [code, participantId, localQuestionIndex]);
+  }, [code, participantId]);
 
   useEffect(() => {
     fetchCurrentState();
@@ -288,12 +287,28 @@ export default function ParticipantPlayPage() {
     };
   }, [code, fetchCurrentState, participantId]);
 
-  // Local timer countdown tick
+  // Per-question timer countdown tick
   useEffect(() => {
-    if (sessionState?.current_state === 'QUESTION_ACTIVE') {
+    if (sessionState?.current_state === 'QUESTION_ACTIVE' && !showCompletionScreen) {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = setInterval(() => {
-        setTimerRemainingSec((prev) => (prev > 0 ? prev - 1 : 0));
+        setTimerRemainingSec((prev) => {
+          if (prev <= 1) {
+            // Auto advance to next question when timer runs out
+            if (questionsList.length > 0 && myQuestionIndex + 1 < questionsList.length) {
+              const nextIndex = myQuestionIndex + 1;
+              setMyQuestionIndex(nextIndex);
+              setSelectedOption(null);
+              setSubmitted(false);
+              return questionsList[nextIndex]?.timer_seconds || 30;
+            } else if (questionsList.length > 0) {
+              setShowCompletionScreen(true);
+              return 0;
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
       }, 1000);
     } else {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -301,19 +316,21 @@ export default function ParticipantPlayPage() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [sessionState?.current_state]);
+  }, [sessionState?.current_state, myQuestionIndex, questionsList, showCompletionScreen]);
 
   // Submit Answer handler — immediately advances participant to next question on success
   const handleOptionSelect = async (index: number) => {
     if (submitted || isRemoved || sessionState?.current_state !== 'QUESTION_ACTIVE') return;
-    if (!activeQuestion?.id) return;
 
-    // Record selection and lock options immediately for responsiveness
+    const currentQ = questionsList[myQuestionIndex] || activeQuestion;
+    if (!currentQ?.id) return;
+
+    // Record selection and lock options immediately
     setSelectedOption(index);
     setSubmitted(true);
 
     // Persist to sessionStorage so refresh/reconnect knows this question was answered
-    sessionStorage.setItem(`pc_ans_${code}_${activeQuestion.id}`, `${index}`);
+    sessionStorage.setItem(`pc_ans_${code}_${currentQ.id}`, `${index}`);
 
     try {
       const res = await fetch(`/api/sessions/${code}/submit-answer`, {
@@ -321,42 +338,40 @@ export default function ParticipantPlayPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           participant_id: participantId,
-          question_id: activeQuestion.id,
+          question_id: currentQ.id,
           selected_option: index,
         }),
       });
 
       if (res.ok) {
-        // Answer persisted on server — advance participant to next question immediately.
-        // Do NOT read or display is_correct / points from the response.
-        const currentIndex = activeQuestion.order_index; // 0-based
-        const totalQuestions = activeQuestion.total_questions;
+        // Answer persisted on server — advance participant to next question IMMEDIATELY.
+        const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
 
-        if (currentIndex + 1 >= totalQuestions) {
-          // This was the final question — show neutral completion screen
+        if (myQuestionIndex + 1 >= totalQ) {
+          // Final question completed — show neutral completion screen
           setShowCompletionScreen(true);
         } else {
-          // Immediately show "Waiting for next question" screen
-          // Set localQuestionIndex to the NEXT index so fetchCurrentState won't reset
-          // our submitted state when the server is still on the same question
-          setLocalQuestionIndex(currentIndex + 1);
-          // Reset for next question display
+          // IMMEDIATELY show next question — no waiting screen!
+          const nextIndex = myQuestionIndex + 1;
+          setMyQuestionIndex(nextIndex);
           setSelectedOption(null);
           setSubmitted(false);
+          const nextQ = questionsList[nextIndex];
+          setTimerRemainingSec(nextQ?.timer_seconds || 30);
         }
       } else {
-        // Server rejected the answer (e.g. time expired) — revert to unsubmitted
+        // Server rejected (e.g. session ended) — revert
         setSubmitted(false);
         setSelectedOption(null);
-        sessionStorage.removeItem(`pc_ans_${code}_${activeQuestion.id}`);
+        sessionStorage.removeItem(`pc_ans_${code}_${currentQ.id}`);
         const errData = await res.json().catch(() => ({}));
         console.warn('Answer rejected by server:', errData.error || res.status);
       }
     } catch (err) {
-      // Network error — revert; participant can retry
+      // Network error — revert
       setSubmitted(false);
       setSelectedOption(null);
-      sessionStorage.removeItem(`pc_ans_${code}_${activeQuestion.id}`);
+      sessionStorage.removeItem(`pc_ans_${code}_${currentQ.id}`);
       console.warn('Error submitting answer:', err);
     }
   };
@@ -496,109 +511,98 @@ export default function ParticipantPlayPage() {
         )}
 
         {/* -------------------------------------------------------- */}
-        {/* 1. WAITING FOR ORGANIZER TO START / BETWEEN QUESTIONS    */}
-        {/* Also shown when participant has just submitted and is     */}
-        {/* waiting for the server to advance to the next question   */}
+        {/* 1. WAITING FOR ORGANIZER TO START (Only before Q1)       */}
         {/* -------------------------------------------------------- */}
-        {!showCompletionScreen && (
-          sessionState?.current_state === 'WAITING' ||
-          (sessionState?.current_state === 'QUESTION_ACTIVE' && localQuestionIndex > (sessionState?.current_question_index ?? -1)) ||
-          sessionState?.current_state === 'QUESTION_ENDED' ||
-          sessionState?.current_state === 'SHOW_LEADERBOARD'
-        ) && (
+        {!showCompletionScreen && sessionState?.current_state === 'WAITING' && (
           <div className="text-center p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
             <div className="w-12 h-12 border-2 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-brand-navy dark:text-white">Waiting for next question...</h2>
+            <h2 className="text-xl font-bold text-brand-navy dark:text-white">Waiting for Quiz to Start...</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-              {sessionState?.current_state === 'WAITING'
-                ? 'Organizer will start the question shortly.'
-                : 'Your answer has been recorded. The next question is coming up.'}
+              Organizer will start the quiz shortly. Please remain on this screen.
             </p>
           </div>
         )}
 
         {/* -------------------------------------------------------- */}
-        {/* 2. QUESTION ACTIVE — only shown when participant has NOT  */}
-        {/* yet submitted for the current server question index       */}
+        {/* 2. QUESTION ACTIVE — Immediate Question 1 -> 2 -> 3 ...  */}
         {/* -------------------------------------------------------- */}
         {!showCompletionScreen &&
-          sessionState?.current_state === 'QUESTION_ACTIVE' &&
-          activeQuestion &&
-          localQuestionIndex <= (sessionState?.current_question_index ?? 0) && (
-          <div className="space-y-4">
-            {/* Question Progress & Timer Bar */}
-            <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
-              <div className="text-xs font-bold text-brand-purple tracking-wide">
-                Question {activeQuestion.order_index + 1} of {activeQuestion.total_questions}
-              </div>
+          sessionState?.current_state !== 'WAITING' &&
+          sessionState?.current_state !== 'FINAL_RESULTS' &&
+          sessionState?.current_state !== 'COMPLETED' &&
+          (questionsList[myQuestionIndex] || activeQuestion) && (
+          (() => {
+            const currentQ = questionsList[myQuestionIndex] || activeQuestion;
+            const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
 
-              {/* Strict Countdown Timer Display */}
-              <div
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold transition-all ${
-                  timerRemainingSec <= 5
-                    ? 'bg-rose-500 text-white animate-pulse'
-                    : 'bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple'
-                }`}
-              >
-                <Clock className="w-3.5 h-3.5" />
-                <span>{timerRemainingSec}s</span>
-              </div>
-            </div>
+            return (
+              <div className="space-y-4">
+                {/* Question Progress & Timer Bar */}
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
+                  <div className="text-xs font-bold text-brand-purple tracking-wide">
+                    Question {myQuestionIndex + 1} of {totalQ}
+                  </div>
 
-            {/* Question Card */}
-            <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
-              <h2 className="text-lg sm:text-xl font-bold leading-snug tracking-tight text-brand-navy dark:text-white">
-                {activeQuestion.question_text}
-              </h2>
-            </div>
-
-            {/* MCQ Answer Options — hidden/locked once submitted */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {activeQuestion.options.map((option: string, idx: number) => {
-                const isSelected = selectedOption === idx;
-                const optionLetters = ['A', 'B', 'C', 'D'];
-
-                return (
-                  <button
-                    key={idx}
-                    onClick={() => handleOptionSelect(idx)}
-                    disabled={submitted || timerRemainingSec === 0}
-                    className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.98] ${
-                      isSelected
-                        ? 'bg-brand-purple text-white border-brand-purple shadow-md scale-[1.01]'
-                        : submitted
-                        ? 'opacity-60 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-                        : 'bg-white/90 dark:bg-brand-cardDark/90 border-slate-300 dark:border-brand-cardBorderDark hover:border-brand-purple/60 hover:bg-brand-purple/5'
+                  {/* Strict Countdown Timer Display */}
+                  <div
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold transition-all ${
+                      timerRemainingSec <= 5
+                        ? 'bg-rose-500 text-white animate-pulse'
+                        : 'bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple'
                     }`}
                   >
-                    <span
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
-                        isSelected
-                          ? 'bg-white text-brand-purple'
-                          : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
-                      }`}
-                    >
-                      {optionLetters[idx]}
-                    </span>
-                    <span className="text-sm font-medium leading-relaxed mt-0.5">{option}</span>
-                  </button>
-                );
-              })}
-            </div>
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{timerRemainingSec}s</span>
+                  </div>
+                </div>
 
-            {/* Submission confirmation — neutral, no correctness info */}
-            {submitted && (
-              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-300 dark:border-emerald-800/50 text-emerald-800 dark:text-emerald-300 text-xs text-center font-semibold flex items-center justify-center gap-2">
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Answer submitted! Waiting for server confirmation...</span>
+                {/* Question Card */}
+                <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
+                  <h2 className="text-lg sm:text-xl font-bold leading-snug tracking-tight text-brand-navy dark:text-white">
+                    {currentQ.question_text}
+                  </h2>
+                </div>
+
+                {/* MCQ Answer Options */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {currentQ.options.map((option: string, idx: number) => {
+                    const isSelected = selectedOption === idx;
+                    const optionLetters = ['A', 'B', 'C', 'D'];
+
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => handleOptionSelect(idx)}
+                        disabled={submitted || timerRemainingSec === 0}
+                        className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.98] ${
+                          isSelected
+                            ? 'bg-brand-purple text-white border-brand-purple shadow-md scale-[1.01]'
+                            : submitted
+                            ? 'opacity-60 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                            : 'bg-white/90 dark:bg-brand-cardDark/90 border-slate-300 dark:border-brand-cardBorderDark hover:border-brand-purple/60 hover:bg-brand-purple/5'
+                        }`}
+                      >
+                        <span
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                            isSelected
+                              ? 'bg-white text-brand-purple'
+                              : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {optionLetters[idx]}
+                        </span>
+                        <span className="text-sm font-medium leading-relaxed mt-0.5">{option}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })()
         )}
 
         {/* -------------------------------------------------------- */}
-        {/* FINAL RESULTS STATE — neutral completion (no scores      */}
-        {/* revealed here; Organizer/Projector handle that flow)     */}
+        {/* FINAL RESULTS / COMPLETED STATE                          */}
         {/* -------------------------------------------------------- */}
         {!showCompletionScreen &&
           (sessionState?.current_state === 'FINAL_RESULTS' ||
