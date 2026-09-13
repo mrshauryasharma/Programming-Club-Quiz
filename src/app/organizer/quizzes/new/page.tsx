@@ -184,31 +184,32 @@ export default function CreateQuizPage() {
     setPdfError(null);
 
     try {
-      // 1. Direct browser-side array buffer extraction (100% immune to serverless/proxy limits)
-      const arrayBuffer = await pdfFile.arrayBuffer();
-      const extractedText = await extractTextFromPdfArrayBuffer(arrayBuffer);
+      // 1. Direct browser-side array buffer extraction (instant zero-latency)
+      try {
+        const arrayBuffer = await pdfFile.arrayBuffer();
+        const extractedText = await extractTextFromPdfArrayBuffer(arrayBuffer);
+        const localQuestions = parseMCQsFromText(extractedText);
 
-      // 2. Parse MCQs directly in browser
-      const localQuestions = parseMCQsFromText(extractedText);
-
-      if (localQuestions && localQuestions.length > 0) {
-        setQuestions(localQuestions);
-        if (!title || title.trim() === '') {
-          setTitle(pdfFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' '));
+        if (localQuestions && localQuestions.length > 0) {
+          setQuestions(localQuestions);
+          if (!title || title.trim() === '') {
+            setTitle(pdfFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' '));
+          }
+          setShowPdfModal(false);
+          setPdfFile(null);
+          return;
         }
-        setShowPdfModal(false);
-        setPdfFile(null);
-        return;
+      } catch (clientErr) {
+        console.warn('Client-side PDF extraction encountered error, attempting server fallback:', clientErr);
       }
 
-      // 3. Fallback: send extracted text as JSON to AI scanner endpoint
+      // 2. Server-side fallback: send full file via multipart FormData
+      const formData = new FormData();
+      formData.append('file', pdfFile);
+
       const res = await fetch('/api/ai/scan-pdf', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: extractedText,
-          title: pdfFile.name.replace(/\.[^/.]+$/, ''),
-        }),
+        body: formData,
       });
 
       if (res.ok) {
@@ -224,8 +225,9 @@ export default function CreateQuizPage() {
         }
       }
 
+      const errData = await res.json().catch(() => null);
       throw new Error(
-        'Could not detect structured MCQs in this PDF. Please verify that questions are numbered (e.g. 1., 2.) with options A, B, C, D.'
+        errData?.error || 'Could not detect questions in this PDF. Please check that the PDF contains readable text.'
       );
     } catch (err: any) {
       setPdfError(err.message || 'Error processing PDF');
