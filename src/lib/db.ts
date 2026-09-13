@@ -674,12 +674,12 @@ class QuizRepository {
     return session;
   }
 
-  // Answer Submission (Server Authoritative: +2 / 0 points, Strict Timer, Tie-Breaker Response Time)
   public async submitAnswer(
     code: string,
     participantId: string,
     questionId: string,
-    selectedOption: number
+    selectedOption: number,
+    clientResponseTimeMs?: number
   ): Promise<{ is_correct: boolean; points: number; response_time_ms: number; total_score: number }> {
     const session = await this.getSessionByCode(code);
     if (!session) throw new Error('Session not found');
@@ -697,7 +697,22 @@ class QuizRepository {
     }
 
     const now = Date.now();
-    const startTime = session.question_start_time || now;
+    const timerSec = targetQuestion.timer_seconds || 30;
+    const maxTimerMs = timerSec * 1000;
+
+    let response_time_ms = 0;
+    if (
+      clientResponseTimeMs &&
+      typeof clientResponseTimeMs === 'number' &&
+      clientResponseTimeMs > 0 &&
+      clientResponseTimeMs <= maxTimerMs + 5000
+    ) {
+      // Accurate client-measured response time for rapid self-paced and synchronized questions
+      response_time_ms = Math.min(maxTimerMs, Math.max(100, Math.round(clientResponseTimeMs)));
+    } else {
+      const startTime = session.question_start_time || now;
+      response_time_ms = Math.min(maxTimerMs, Math.max(100, now - startTime));
+    }
 
     const participant = await this.getParticipantById(session.id, participantId);
     if (!participant) throw new Error('Participant not found');
@@ -713,7 +728,6 @@ class QuizRepository {
       throw new Error('You have already submitted an answer for this question.');
     }
 
-    const response_time_ms = Math.max(0, now - startTime);
     const is_correct = selectedOption === targetQuestion.correct_option_index;
     const points = is_correct ? 2 : 0; // Strict scoring rule: +2 or 0
 

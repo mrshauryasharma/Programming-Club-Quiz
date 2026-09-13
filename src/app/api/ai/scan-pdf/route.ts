@@ -132,18 +132,28 @@ function extractTextFromPdfBuffer(buffer: Buffer): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
+    let rawText = '';
+    let fileName = 'Scanned Quiz';
 
-    if (!file) {
-      return NextResponse.json({ error: 'No PDF file uploaded' }, { status: 400 });
+    const contentType = req.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const body = await req.json();
+      rawText = body.text || '';
+      fileName = body.title || fileName;
+    } else {
+      try {
+        const formData = await req.formData();
+        const file = formData.get('file') as File | null;
+        if (file) {
+          fileName = file.name;
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          rawText = extractTextFromPdfBuffer(buffer);
+        }
+      } catch (formErr) {
+        console.warn('FormData read error:', formErr);
+      }
     }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // Extract text using pure JS stream extractor
-    const rawText = extractTextFromPdfBuffer(buffer);
 
     if (!rawText || !rawText.trim()) {
       return NextResponse.json(
@@ -206,7 +216,7 @@ ${rawText.slice(0, 10000)}`;
             return NextResponse.json({
               success: true,
               provider: 'Meta AI',
-              title: parsed.title || file.name.replace(/\.[^/.]+$/, ''),
+              title: parsed.title || fileName.replace(/\.[^/.]+$/, ''),
               questions: parsed.questions,
             });
           }
@@ -223,7 +233,7 @@ ${rawText.slice(0, 10000)}`;
       return NextResponse.json({
         success: true,
         provider: 'PDF Scanner',
-        title: file.name.replace(/\.[^/.]+$/, ''),
+        title: fileName.replace(/\.[^/.]+$/, ''),
         questions: fallbackQuestions,
       });
     }

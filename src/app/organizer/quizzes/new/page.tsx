@@ -18,6 +18,7 @@ import {
   FileText,
   X,
 } from 'lucide-react';
+import { parseMCQsFromText, extractTextFromPdfArrayBuffer } from '@/lib/pdfParser';
 
 interface QuestionForm {
   question_text: string;
@@ -183,36 +184,49 @@ export default function CreateQuizPage() {
     setPdfError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', pdfFile);
+      // 1. Direct browser-side array buffer extraction (100% immune to serverless/proxy limits)
+      const arrayBuffer = await pdfFile.arrayBuffer();
+      const extractedText = await extractTextFromPdfArrayBuffer(arrayBuffer);
 
-      const res = await fetch('/api/ai/scan-pdf', {
-        method: 'POST',
-        body: formData,
-      });
+      // 2. Parse MCQs directly in browser
+      const localQuestions = parseMCQsFromText(extractedText);
 
-      const text = await res.text();
-      let data: any = null;
-      try {
-        data = text ? JSON.parse(text) : null;
-      } catch {
-        throw new Error(text || `Server returned non-JSON error (Status ${res.status}). Please try again.`);
-      }
-
-      if (!res.ok) {
-        throw new Error(data?.error || `Failed to extract questions from PDF (Status ${res.status})`);
-      }
-
-      if (data?.questions && data.questions.length > 0) {
-        setQuestions(data.questions);
-        if (data.title && (!title || title.trim() === '')) {
-          setTitle(data.title);
+      if (localQuestions && localQuestions.length > 0) {
+        setQuestions(localQuestions);
+        if (!title || title.trim() === '') {
+          setTitle(pdfFile.name.replace(/\.[^/.]+$/, '').replace(/[_-]+/g, ' '));
         }
         setShowPdfModal(false);
         setPdfFile(null);
-      } else {
-        throw new Error('No valid MCQs could be extracted from this PDF. Please check that the questions are numbered with options A, B, C, D.');
+        return;
       }
+
+      // 3. Fallback: send extracted text as JSON to AI scanner endpoint
+      const res = await fetch('/api/ai/scan-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: extractedText,
+          title: pdfFile.name.replace(/\.[^/.]+$/, ''),
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.questions && data.questions.length > 0) {
+          setQuestions(data.questions);
+          if (data.title && (!title || title.trim() === '')) {
+            setTitle(data.title);
+          }
+          setShowPdfModal(false);
+          setPdfFile(null);
+          return;
+        }
+      }
+
+      throw new Error(
+        'Could not detect structured MCQs in this PDF. Please verify that questions are numbered (e.g. 1., 2.) with options A, B, C, D.'
+      );
     } catch (err: any) {
       setPdfError(err.message || 'Error processing PDF');
     } finally {

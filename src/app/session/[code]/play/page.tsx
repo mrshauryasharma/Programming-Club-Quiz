@@ -63,6 +63,7 @@ export default function ParticipantPlayPage() {
 
   const lastViolationTimeRef = useRef<number>(0);
   const isWarningModalOpenRef = useRef<boolean>(false);
+  const questionStartTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     isWarningModalOpenRef.current = showWarningModal !== null;
@@ -344,60 +345,51 @@ export default function ParticipantPlayPage() {
     };
   }, [sessionState?.current_state, myQuestionIndex, questionsList, showCompletionScreen]);
 
-  // Submit Answer handler — immediately advances participant to next question on success
+  // Submit Answer handler — immediately advances participant to next question with exact response timing
   const handleOptionSelect = async (index: number) => {
     if (submitted || isRemoved || sessionState?.current_state !== 'QUESTION_ACTIVE') return;
 
     const currentQ = questionsList[myQuestionIndex] || activeQuestion;
     if (!currentQ?.id) return;
 
-    // Record selection and lock options immediately
-    setSelectedOption(index);
-    setSubmitted(true);
+    // Measure exact time spent specifically on this question
+    const timeSpentMs = Math.max(150, Date.now() - questionStartTimeRef.current);
 
     // Persist to sessionStorage so refresh/reconnect knows this question was answered
     sessionStorage.setItem(`pc_ans_${code}_${currentQ.id}`, `${index}`);
 
+    const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
+
+    // Seamless instant transition — zero wait, zero freeze!
+    if (myQuestionIndex + 1 >= totalQ) {
+      setSelectedOption(index);
+      setSubmitted(true);
+      setShowCompletionScreen(true);
+    } else {
+      const nextIndex = myQuestionIndex + 1;
+      setMyQuestionIndex(nextIndex);
+      setSelectedOption(null);
+      setSubmitted(false);
+      questionStartTimeRef.current = Date.now();
+      const nextQ = questionsList[nextIndex];
+      setTimerRemainingSec(nextQ?.timer_seconds || 30);
+    }
+
+    // Persist answer and accurate timing on server in background
     try {
-      const res = await fetch(`/api/sessions/${code}/submit-answer`, {
+      fetch(`/api/sessions/${code}/submit-answer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           participant_id: participantId,
           question_id: currentQ.id,
           selected_option: index,
+          response_time_ms: timeSpentMs,
         }),
+      }).catch((err) => {
+        console.warn('Background answer submit failed:', err);
       });
-
-      if (res.ok) {
-        // Answer persisted on server — advance participant to next question IMMEDIATELY.
-        const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
-
-        if (myQuestionIndex + 1 >= totalQ) {
-          // Final question completed — show neutral completion screen
-          setShowCompletionScreen(true);
-        } else {
-          // IMMEDIATELY show next question — no waiting screen!
-          const nextIndex = myQuestionIndex + 1;
-          setMyQuestionIndex(nextIndex);
-          setSelectedOption(null);
-          setSubmitted(false);
-          const nextQ = questionsList[nextIndex];
-          setTimerRemainingSec(nextQ?.timer_seconds || 30);
-        }
-      } else {
-        // Server rejected (e.g. session ended) — revert
-        setSubmitted(false);
-        setSelectedOption(null);
-        sessionStorage.removeItem(`pc_ans_${code}_${currentQ.id}`);
-        const errData = await res.json().catch(() => ({}));
-        console.warn('Answer rejected by server:', errData.error || res.status);
-      }
     } catch (err) {
-      // Network error — revert
-      setSubmitted(false);
-      setSelectedOption(null);
-      sessionStorage.removeItem(`pc_ans_${code}_${currentQ.id}`);
       console.warn('Error submitting answer:', err);
     }
   };

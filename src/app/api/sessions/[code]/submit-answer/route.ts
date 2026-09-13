@@ -4,7 +4,7 @@ import { db } from '@/lib/db';
 export async function POST(req: NextRequest, context: { params: Promise<{ code: string }> }) {
   try {
     const { code } = await context.params;
-    const { participant_id, question_id, selected_option } = await req.json();
+    const { participant_id, question_id, selected_option, response_time_ms } = await req.json();
 
     if (!participant_id) {
       return NextResponse.json({ error: 'Participant ID is required' }, { status: 400 });
@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
       return NextResponse.json({ error: 'Invalid option selected' }, { status: 400 });
     }
 
-    const result = await db.submitAnswer(code, participant_id, question_id, selected_option);
+    const result = await db.submitAnswer(code, participant_id, question_id, selected_option, response_time_ms);
 
     return NextResponse.json({
       success: true,
