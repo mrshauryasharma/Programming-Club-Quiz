@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Clock,
   Award,
+  LogOut,
 } from 'lucide-react';
 
 export default function ParticipantPlayPage() {
@@ -60,11 +61,36 @@ export default function ParticipantPlayPage() {
     }
   };
 
+  const lastViolationTimeRef = useRef<number>(0);
+  const isWarningModalOpenRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isWarningModalOpenRef.current = showWarningModal !== null;
+  }, [showWarningModal]);
+
+  // Clean exit helper
+  const handleExitQuiz = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('pc_quiz_participant_id');
+      sessionStorage.removeItem('pc_quiz_participant_name');
+      sessionStorage.removeItem('pc_quiz_session_code');
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith('pc_ans_')) sessionStorage.removeItem(k);
+      });
+    }
+    router.push('/');
+  };
+
   // Anti-cheat violation reporter
   const reportViolation = useCallback(
     async (type: string) => {
-      // Ignore if disconnected (network loss is NOT cheating) or already removed
-      if (!navigator.onLine || isRemoved || !participantId) return;
+      // Ignore if disconnected, already removed, or warning modal is currently open waiting for user acknowledgement
+      if (!navigator.onLine || isRemoved || !participantId || isWarningModalOpenRef.current) return;
+
+      // Throttle/debounce within 3000ms so a single tab switch does not fire both blur and visibilitychange
+      const now = Date.now();
+      if (now - lastViolationTimeRef.current < 3000) return;
+      lastViolationTimeRef.current = now;
 
       try {
         const res = await fetch(`/api/sessions/${code}/violation`, {
@@ -449,7 +475,7 @@ export default function ParticipantPlayPage() {
           </button>
 
           {/* Warning Badge */}
-          {warningCount > 0 && (
+          {!showCompletionScreen && warningCount > 0 && (
             <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
               <AlertTriangle className="w-3 h-3" />
               <span>
@@ -478,8 +504,11 @@ export default function ParticipantPlayPage() {
               {showWarningModal === 2 && ' CAUTION: A 3rd violation will cause IMMEDIATE REMOVAL.'}
             </p>
             <button
-              onClick={() => setShowWarningModal(null)}
-              className="mt-5 w-full py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+              onClick={() => {
+                setShowWarningModal(null);
+                lastViolationTimeRef.current = Date.now();
+              }}
+              className="mt-5 w-full py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer active:scale-95"
             >
               I Understand & Remain Focused
             </button>
@@ -494,19 +523,27 @@ export default function ParticipantPlayPage() {
         {/* COMPLETION SCREEN — shown immediately after final question submit */}
         {/* OR when server reaches FINAL_RESULTS/COMPLETED state           */}
         {/* -------------------------------------------------------- */}
-        {showCompletionScreen && (
+        {(showCompletionScreen ||
+          sessionState?.current_state === 'FINAL_RESULTS' ||
+          sessionState?.current_state === 'COMPLETED') && (
           <div className="p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-brand-purple/15 text-brand-purple flex items-center justify-center mb-4 border border-brand-purple/30">
-              <Award className="w-9 h-9" />
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-4 border border-emerald-500/30">
+              <CheckCircle2 className="w-9 h-9" />
             </div>
-            <h2 className="text-2xl font-black text-brand-navy dark:text-white">Quiz Completed!</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
-              Your answers have been recorded.
+            <h2 className="text-2xl font-black text-brand-navy dark:text-white">Answers Successfully Submitted!</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 leading-relaxed">
+              Thank you for participating with USICT GBU Programming Club. Your responses and response times have been safely recorded.
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              Please wait for the Organizer to reveal the final results.
-            </p>
-            <div className="mt-6 w-8 h-8 border-2 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto" />
+            <div className="mt-4 p-3.5 rounded-xl bg-slate-100 dark:bg-brand-cardDark/80 border border-slate-200 dark:border-brand-cardBorderDark text-xs text-slate-500 dark:text-slate-400">
+              Winners and top performers will be announced directly by the Organizer.
+            </div>
+            <button
+              onClick={handleExitQuiz}
+              className="mt-6 px-6 py-2.5 rounded-xl bg-brand-purple hover:bg-[#6A1694] text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer inline-flex items-center gap-2"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Exit Quiz</span>
+            </button>
           </div>
         )}
 
@@ -537,6 +574,23 @@ export default function ParticipantPlayPage() {
 
             return (
               <div className="space-y-4">
+                {/* Visual Progress Bar (Step Indicator) */}
+                <div className="flex items-center gap-1.5 w-full px-1">
+                  {Array.from({ length: totalQ }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-2 flex-1 rounded-full transition-all duration-300 ${
+                        i < myQuestionIndex
+                          ? 'bg-emerald-500'
+                          : i === myQuestionIndex
+                          ? 'bg-brand-purple ring-2 ring-brand-purple/40 ring-offset-1 dark:ring-offset-[#020205]'
+                          : 'bg-slate-200 dark:bg-slate-800'
+                      }`}
+                      title={`Question ${i + 1}`}
+                    />
+                  ))}
+                </div>
+
                 {/* Question Progress & Timer Bar */}
                 <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
                   <div className="text-xs font-bold text-brand-purple tracking-wide">
@@ -599,26 +653,6 @@ export default function ParticipantPlayPage() {
               </div>
             );
           })()
-        )}
-
-        {/* -------------------------------------------------------- */}
-        {/* FINAL RESULTS / COMPLETED STATE                          */}
-        {/* -------------------------------------------------------- */}
-        {!showCompletionScreen &&
-          (sessionState?.current_state === 'FINAL_RESULTS' ||
-            sessionState?.current_state === 'COMPLETED') && (
-          <div className="p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-brand-purple/15 text-brand-purple flex items-center justify-center mb-4 border border-brand-purple/30">
-              <Award className="w-9 h-9" />
-            </div>
-            <h2 className="text-2xl font-black text-brand-navy dark:text-white">Quiz Completed!</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-3 leading-relaxed">
-              Your answers have been recorded.
-            </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-              Please wait for the Organizer to reveal the final results.
-            </p>
-          </div>
         )}
       </div>
 

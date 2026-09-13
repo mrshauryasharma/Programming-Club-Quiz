@@ -13,6 +13,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
+  FileUp,
+  Upload,
+  FileText,
+  X,
 } from 'lucide-react';
 
 interface QuestionForm {
@@ -44,6 +48,12 @@ export default function CreateQuizPage() {
   const [aiTopic, setAiTopic] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
+  // PDF Scanner modal state
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const addQuestion = () => {
     setQuestions([
@@ -167,6 +177,42 @@ export default function CreateQuizPage() {
     }
   };
 
+  const handleScanPdf = async () => {
+    if (!pdfFile) return;
+    setPdfLoading(true);
+    setPdfError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', pdfFile);
+
+      const res = await fetch('/api/ai/scan-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to extract questions from PDF');
+      }
+
+      if (data.questions && data.questions.length > 0) {
+        setQuestions(data.questions);
+        if (data.title && (!title || title.trim() === '')) {
+          setTitle(data.title);
+        }
+        setShowPdfModal(false);
+        setPdfFile(null);
+      } else {
+        throw new Error('No valid MCQs could be extracted from this PDF.');
+      }
+    } catch (err: any) {
+      setPdfError(err.message || 'Error processing PDF');
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
   const timerPresets = [10, 15, 20, 30, 45, 60, 90, 120];
 
   return (
@@ -193,14 +239,24 @@ export default function CreateQuizPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowAiModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple border border-brand-purple/30 font-bold text-xs flex items-center gap-2 hover:bg-brand-purple hover:text-white transition-all cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4" />
-            <span>Generate with Meta AI</span>
-          </button>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowPdfModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm"
+            >
+              <FileUp className="w-4 h-4" />
+              <span>Scan / Upload PDF</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAiModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple border border-brand-purple/30 font-bold text-xs flex items-center gap-2 hover:bg-brand-purple hover:text-white transition-all cursor-pointer"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Generate with Meta AI</span>
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -420,6 +476,114 @@ export default function CreateQuizPage() {
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
                   <span>Generate Questions</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Scanner Modal */}
+      {showPdfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md p-6 rounded-2xl bg-white dark:bg-brand-cardDark border border-blue-500 text-left shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                <FileUp className="w-5 h-5" />
+                <h3 className="text-base font-bold">Scan PDF Question Paper</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPdfModal(false);
+                  setPdfFile(null);
+                  setPdfError(null);
+                }}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+              Upload a PDF document with MCQs (e.g. 1. Question... A) ... B) ... C) ... D) ... Ans: B). The system will automatically parse and load the questions directly into your quiz.
+            </p>
+
+            {pdfError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{pdfError}</span>
+              </div>
+            )}
+
+            <div className="mb-5">
+              <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-[#080E2B]/50">
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPdfFile(file);
+                      setPdfError(null);
+                    }
+                  }}
+                />
+                {pdfFile ? (
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-8 h-8 text-blue-500" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold text-slate-800 dark:text-white truncate max-w-[200px]">
+                        {pdfFile.name}
+                      </p>
+                      <p className="text-[10px] text-slate-400">
+                        {(pdfFile.size / 1024).toFixed(1)} KB • Click to change
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Upload className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-2" />
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                      Click to choose PDF question paper
+                    </p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                      Supports standard MCQ format (.pdf up to 10MB)
+                    </p>
+                  </>
+                )}
+              </label>
+            </div>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPdfModal(false);
+                  setPdfFile(null);
+                  setPdfError(null);
+                }}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleScanPdf}
+                disabled={!pdfFile || pdfLoading}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-md shadow-blue-600/20"
+              >
+                {pdfLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Extracting Questions...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileUp className="w-4 h-4" />
+                    <span>Scan & Load MCQs</span>
+                  </>
                 )}
               </button>
             </div>
