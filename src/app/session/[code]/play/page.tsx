@@ -35,8 +35,7 @@ export default function ParticipantPlayPage() {
   // Submission & Local state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [pendingOption, setPendingOption] = useState<number | null>(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [questionsList, setQuestionsList] = useState<any[]>([]);
   const [myQuestionIndex, setMyQuestionIndex] = useState<number>(0);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
@@ -213,7 +212,8 @@ export default function ParticipantPlayPage() {
 
   const fetchCurrentState = useCallback(async () => {
     try {
-      const pParam = participantId ? `participant_id=${encodeURIComponent(participantId)}` : '';
+      const effectivePid = participantId || (typeof window !== 'undefined' ? sessionStorage.getItem('pc_quiz_participant_id') : '') || '';
+      const pParam = effectivePid ? `participant_id=${encodeURIComponent(effectivePid)}` : '';
       const tParam = `_t=${Date.now()}`;
       const queryStr = `?${[pParam, tParam].filter(Boolean).join('&')}`;
       const res = await fetch(`/api/sessions/${code}/state${queryStr}`, {
@@ -238,8 +238,8 @@ export default function ParticipantPlayPage() {
               const isAnsweredOnServer = serverAnswered.includes(q.id);
               const isAnsweredInStorage =
                 typeof window !== 'undefined' &&
-                participantId &&
-                !!sessionStorage.getItem(`pc_ans_${code}_${participantId}_${q.id}`);
+                effectivePid &&
+                sessionStorage.getItem(`pc_ans_${code}_${effectivePid}_${q.id}`) !== null;
 
               if (isAnsweredOnServer || isAnsweredInStorage) {
                 restoreIndex = i + 1;
@@ -251,7 +251,7 @@ export default function ParticipantPlayPage() {
             if (restoreIndex >= data.questions.length) {
               setShowCompletionScreen(true);
             } else {
-              setMyQuestionIndex(restoreIndex);
+              setMyQuestionIndex((prevIdx) => Math.max(prevIdx, restoreIndex));
               questionStartTimeRef.current = Date.now();
               setTimerRemainingSec(data.questions[restoreIndex]?.timer_seconds || 30);
             }
@@ -330,27 +330,33 @@ export default function ParticipantPlayPage() {
     };
   }, [code, fetchCurrentState, participantId]);
 
+  // Prevent browser back button navigation to previous questions
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', window.location.href);
+      const handlePopState = () => {
+        window.history.pushState(null, '', window.location.href);
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => {
+        window.removeEventListener('popstate', handlePopState);
+      };
+    }
+  }, []);
+
   // Per-question timer countdown tick
   useEffect(() => {
-    if (sessionState?.current_state === 'QUESTION_ACTIVE' && !showCompletionScreen) {
+    const isQuizActive =
+      !showCompletionScreen &&
+      sessionState?.current_state !== 'WAITING' &&
+      sessionState?.current_state !== 'FINAL_RESULTS' &&
+      sessionState?.current_state !== 'COMPLETED';
+
+    if (isQuizActive) {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
       timerIntervalRef.current = setInterval(() => {
         setTimerRemainingSec((prev) => {
           if (prev <= 1) {
-            // Auto advance to next question when timer runs out
-            if (questionsList.length > 0 && myQuestionIndex + 1 < questionsList.length) {
-              const nextIndex = myQuestionIndex + 1;
-              setMyQuestionIndex(nextIndex);
-              setSelectedOption(null);
-              setSubmitted(false);
-              setPendingOption(null);
-              setShowConfirmModal(false);
-              questionStartTimeRef.current = Date.now();
-              return questionsList[nextIndex]?.timer_seconds || 30;
-            } else if (questionsList.length > 0) {
-              setShowCompletionScreen(true);
-              return 0;
-            }
             return 0;
           }
           return prev - 1;
@@ -362,75 +368,116 @@ export default function ParticipantPlayPage() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [sessionState?.current_state, myQuestionIndex, questionsList, showCompletionScreen]);
+  }, [sessionState?.current_state, showCompletionScreen]);
 
-  // Submit Answer handler — split into two steps: select → confirm → submit
+  // Handle timer running out (0s): auto advance and record timeout so student cannot go back
+  useEffect(() => {
+    if (timerRemainingSec === 0 && !showCompletionScreen && questionsList.length > 0) {
+      const currentQ = questionsList[myQuestionIndex] || activeQuestion;
+      const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
+      const effectivePid =
+        participantId ||
+        (typeof window !== 'undefined' ? sessionStorage.getItem('pc_quiz_participant_id') : '') ||
+        '';
+
+      if (currentQ?.id && effectivePid) {
+        sessionStorage.setItem(
+          `pc_ans_${code}_${effectivePid}_${currentQ.id}`,
+          selectedOption !== null ? `${selectedOption}` : 'timeout'
+        );
+
+        if (selectedOption !== null) {
+          fetch(`/api/sessions/${code}/submit-answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              participant_id: effectivePid,
+              question_id: currentQ.id,
+              selected_option: selectedOption,
+              response_time_ms: (currentQ.timer_seconds || 30) * 1000,
+            }),
+          }).catch(() => {});
+        }
+      }
+
+      if (myQuestionIndex + 1 >= totalQ) {
+        setSubmitted(true);
+        setShowCompletionScreen(true);
+      } else {
+        const nextIndex = myQuestionIndex + 1;
+        setMyQuestionIndex(nextIndex);
+        setSelectedOption(null);
+        questionStartTimeRef.current = Date.now();
+        const nextQ = questionsList[nextIndex];
+        setTimerRemainingSec(nextQ?.timer_seconds || 30);
+      }
+    }
+  }, [timerRemainingSec, showCompletionScreen, questionsList, myQuestionIndex, activeQuestion, code, participantId, selectedOption]);
+
+  // Option selection: selects the option so student can change before confirming
   const handleOptionSelect = (index: number) => {
-    if (submitted || isRemoved || sessionState?.current_state !== 'QUESTION_ACTIVE') return;
-    // Highlight the selected option and show confirmation modal
-    setPendingOption(index);
+    if (isSubmitting || submitted || isRemoved) return;
     setSelectedOption(index);
-    setShowConfirmModal(true);
   };
 
-  // Cancel confirmation — deselect option
-  const handleCancelConfirm = () => {
-    setPendingOption(null);
-    setSelectedOption(null);
-    setShowConfirmModal(false);
-  };
-
-  // Confirm and submit the answer — then advance to next question
+  // Confirm and submit the answer — locks in answer and advances to next question (CANNOT GO BACK!)
   const handleConfirmSubmit = async () => {
-    if (pendingOption === null || submitted || isRemoved) return;
-    setShowConfirmModal(false);
+    if (selectedOption === null || isSubmitting || submitted || isRemoved) return;
 
-    const index = pendingOption;
     const currentQ = questionsList[myQuestionIndex] || activeQuestion;
     if (!currentQ?.id) return;
 
-    // Measure exact time spent specifically on this question
+    setIsSubmitting(true);
+    const chosenIndex = selectedOption;
+    const effectivePid =
+      participantId ||
+      (typeof window !== 'undefined' ? sessionStorage.getItem('pc_quiz_participant_id') : '') ||
+      '';
+
+    // Measure exact time spent on this question
     const timeSpentMs = Math.max(150, Date.now() - questionStartTimeRef.current);
 
-    // Persist to sessionStorage scoped by participantId so refresh/reconnect knows this question was answered
-    if (typeof window !== 'undefined' && participantId) {
-      sessionStorage.setItem(`pc_ans_${code}_${participantId}_${currentQ.id}`, `${index}`);
+    // Persist to sessionStorage scoped by participantId so refresh/reconnect permanently locks this question
+    if (typeof window !== 'undefined' && effectivePid) {
+      sessionStorage.setItem(`pc_ans_${code}_${effectivePid}_${currentQ.id}`, `${chosenIndex}`);
     }
 
     const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
 
-    // Seamless instant transition — zero wait, zero freeze!
+    // Send answer to server in background
+    try {
+      if (effectivePid) {
+        fetch(`/api/sessions/${code}/submit-answer`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            participant_id: effectivePid,
+            question_id: currentQ.id,
+            selected_option: chosenIndex,
+            response_time_ms: timeSpentMs,
+          }),
+        }).catch((err) => {
+          console.warn('Background answer submit failed:', err);
+        });
+      }
+    } catch (err) {
+      console.warn('Error submitting answer:', err);
+    }
+
+    // Advance to next question — PREVIOUS QUESTION IS PERMANENTLY LOCKED
     if (myQuestionIndex + 1 >= totalQ) {
-      setSelectedOption(index);
       setSubmitted(true);
       setShowCompletionScreen(true);
+      setIsSubmitting(false);
     } else {
       const nextIndex = myQuestionIndex + 1;
       setMyQuestionIndex(nextIndex);
       setSelectedOption(null);
       setSubmitted(false);
+      setIsSubmitting(false);
       questionStartTimeRef.current = Date.now();
       const nextQ = questionsList[nextIndex];
       setTimerRemainingSec(nextQ?.timer_seconds || 30);
-    }
-    setPendingOption(null);
-
-    // Persist answer and accurate timing on server in background
-    try {
-      fetch(`/api/sessions/${code}/submit-answer`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          participant_id: participantId,
-          question_id: currentQ.id,
-          selected_option: index,
-          response_time_ms: timeSpentMs,
-        }),
-      }).catch((err) => {
-        console.warn('Background answer submit failed:', err);
-      });
-    } catch (err) {
-      console.warn('Error submitting answer:', err);
     }
   };
 
@@ -658,86 +705,84 @@ export default function ParticipantPlayPage() {
                     return (
                       <button
                         key={idx}
+                        type="button"
                         onClick={() => handleOptionSelect(idx)}
-                        disabled={submitted || timerRemainingSec === 0}
-                        className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.98] ${
+                        disabled={isSubmitting || submitted}
+                        className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.99] ${
                           isSelected
-                            ? 'bg-brand-purple text-white border-brand-purple shadow-md scale-[1.01]'
-                            : submitted
+                            ? 'bg-brand-purple/15 text-brand-navy dark:text-white border-brand-purple ring-2 ring-brand-purple/60 shadow-md font-semibold'
+                            : isSubmitting || submitted
                             ? 'opacity-60 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
                             : 'bg-white/90 dark:bg-brand-cardDark/90 border-slate-300 dark:border-brand-cardBorderDark hover:border-brand-purple/60 hover:bg-brand-purple/5'
                         }`}
                       >
                         <span
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
                             isSelected
-                              ? 'bg-white text-brand-purple'
+                              ? 'bg-brand-purple text-white shadow-sm'
                               : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                           }`}
                         >
-                          {optionLetters[idx]}
+                          {isSelected ? '✓' : optionLetters[idx]}
                         </span>
-                        <span className="text-sm font-medium leading-relaxed mt-0.5">{option}</span>
+                        <span className="text-sm font-medium leading-relaxed mt-0.5 flex-1">{option}</span>
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Confirm & Submit Action Card (Like a proper quiz website) */}
+                <div className="pt-2">
+                  <div className="p-4 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-md space-y-3">
+                    {selectedOption !== null ? (
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <div className="flex items-center gap-1.5 text-brand-purple font-semibold">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Option {['A', 'B', 'C', 'D'][selectedOption]} selected</span>
+                        </div>
+                        <span className="text-slate-500 dark:text-slate-400">Tap another option to change</span>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-center text-slate-500 dark:text-slate-400">
+                        Select an option above to unlock submission
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleConfirmSubmit}
+                      disabled={selectedOption === null || isSubmitting || submitted}
+                      className={`w-full py-3.5 px-5 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all shadow-md ${
+                        selectedOption !== null && !isSubmitting && !submitted
+                          ? 'bg-brand-purple hover:bg-[#6A1694] text-white cursor-pointer active:scale-[0.98] shadow-brand-purple/25'
+                          : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          <span>Locking & Submitting Answer...</span>
+                        </>
+                      ) : selectedOption !== null ? (
+                        <>
+                          <span>Confirm & Submit Answer</span>
+                          <span>→</span>
+                        </>
+                      ) : (
+                        <span>Select an option to confirm</span>
+                      )}
+                    </button>
+
+                    <p className="text-[11px] text-center text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1">
+                      <span>🔒 Once confirmed, your answer is locked and you cannot return.</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             );
           })()
         )}
       </div>
-
-      {/* Confirmation Modal — "Are you sure? You cannot go back!" */}
-      {showConfirmModal && pendingOption !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm bg-white dark:bg-brand-cardDark rounded-2xl shadow-2xl border border-slate-200 dark:border-brand-cardBorderDark overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 px-5 py-3 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
-              <h3 className="font-bold text-amber-800 dark:text-amber-300 text-base">Confirm Your Answer</h3>
-            </div>
-
-            {/* Body */}
-            <div className="px-5 py-4 space-y-3">
-              <p className="text-sm text-slate-600 dark:text-slate-300">
-                You selected:
-              </p>
-              <div className="p-3 rounded-xl bg-brand-purple/10 dark:bg-brand-purple/20 border border-brand-purple/30 flex items-center gap-3">
-                <span className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs bg-brand-purple text-white shrink-0">
-                  {['A', 'B', 'C', 'D'][pendingOption]}
-                </span>
-                <span className="text-sm font-semibold text-brand-navy dark:text-white">
-                  {(() => {
-                    const currentQ = questionsList[myQuestionIndex] || activeQuestion;
-                    return currentQ?.options?.[pendingOption] || `Option ${pendingOption + 1}`;
-                  })()}
-                </span>
-              </div>
-              <p className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 mt-1">
-                <Ban className="w-3.5 h-3.5 shrink-0" />
-                ⚠️ Once confirmed, you CANNOT change your answer!
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="px-5 pb-5 flex gap-3">
-              <button
-                onClick={handleCancelConfirm}
-                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-              >
-                Change
-              </button>
-              <button
-                onClick={handleConfirmSubmit}
-                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-brand-purple hover:bg-brand-purple/90 shadow-md transition-colors"
-              >
-                ✅ Confirm & Submit
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Footer */}
       <footer className="w-full max-w-2xl mx-auto text-center py-2 text-[11px] text-slate-500 dark:text-slate-400">
