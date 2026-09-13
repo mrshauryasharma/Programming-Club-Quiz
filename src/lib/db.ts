@@ -600,14 +600,25 @@ class QuizRepository {
     if (!cleanRoll) throw new Error('Roll Number is required');
     if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('A valid Email ID is required');
 
+    // Strict Rule: Single attempt per quiz. A student cannot re-attempt an already completed quiz.
+    const hasAlreadyCompleted = await this.hasParticipantCompletedQuiz(session.quiz_id, cleanRoll, cleanEmail);
+    if (hasAlreadyCompleted) {
+      throw new Error(`Roll Number ${cleanRoll} has already completed this quiz. Multiple attempts are strictly prohibited.`);
+    }
+
     // Fetch existing participants in THIS active session
     let pList = await this.getParticipants(session.id);
 
-    // Roll number uniqueness enforced strictly WITHIN this session
-    const existing = pList.find(p => p.roll_no?.toUpperCase() === cleanRoll);
+    // Roll number or Email uniqueness enforced strictly WITHIN this session
+    const existing = pList.find(
+      p => p.roll_no?.toUpperCase() === cleanRoll || p.email?.toLowerCase() === cleanEmail
+    );
     if (existing) {
       if (existing.status === 'removed') {
         throw new Error('This participant has been removed from this session for cheating violations');
+      }
+      if (existing.status === 'completed') {
+        throw new Error(`Roll Number ${cleanRoll} has already completed this quiz. Multiple attempts are strictly prohibited.`);
       }
       return { participant: existing, session };
     }
@@ -852,6 +863,10 @@ class QuizRepository {
       throw new Error('You have been removed from this session and cannot answer.');
     }
 
+    if (participant.status === 'completed') {
+      throw new Error('You have already completed this quiz. No further submissions are allowed.');
+    }
+
     // Check if participant already answered this question
     const answersList = this.answers.get(session.id) || [];
     const alreadyAnswered = answersList.some(a => a.participant_id === participantId && a.question_id === questionId);
@@ -881,6 +896,13 @@ class QuizRepository {
     participant.total_score += points;
     participant.total_response_time_ms += response_time_ms;
 
+    // Check if participant has completed all questions in the quiz
+    const totalQuizQuestions = quiz.questions.length;
+    const pAnswersCount = answersList.filter(a => a.participant_id === participantId).length;
+    if (pAnswersCount >= totalQuizQuestions) {
+      participant.status = 'completed';
+    }
+
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
@@ -897,13 +919,14 @@ class QuizRepository {
           response_time_ms,
         });
 
-        // Update existing participants table: score, total_response_time_ms
+        // Update existing participants table: score, total_response_time_ms, status
         await supabase
           .from('participants')
           .update({
             score: participant.total_score,
             total_response_time_ms: participant.total_response_time_ms,
             correct_count: Math.floor(participant.total_score / 2),
+            status: participant.status === 'completed' ? 'COMPLETED' : 'ACTIVE',
           })
           .eq('id', participantId);
       } catch (e) {
@@ -1073,6 +1096,84 @@ class QuizRepository {
     }
 
     return { total, completed };
+  }
+
+  // Check if a student (identified by Roll No or Email) has already completed this quiz
+  public async hasParticipantCompletedQuiz(quizId: string, rollNo?: string, email?: string): Promise<boolean> {
+    const cleanRoll = rollNo?.trim().toUpperCase();
+    const cleanEmail = email?.trim().toLowerCase();
+    if (!cleanRoll && !cleanEmail) return false;
+
+    const quiz = await this.getQuizById(quizId);
+    const totalQuestions = quiz?.questions?.length || 0;
+    if (totalQuestions === 0) return false;
+
+    // 1. Check in-memory sessions for this quiz
+    for (const [sId, session] of this.sessions.entries()) {
+      if (session.quiz_id === quizId) {
+        const pList = this.participants.get(session.id) || [];
+        const match = pList.find(
+          p => (cleanRoll && p.roll_no?.toUpperCase() === cleanRoll) ||
+               (cleanEmail && p.email?.toLowerCase() === cleanEmail)
+        );
+
+        if (match) {
+          if (match.status === 'completed') return true;
+          const answers = (this.answers.get(session.id) || []).filter(a => a.participant_id === match.id);
+          if (answers.length >= totalQuestions) return true;
+        }
+      }
+    }
+
+    // 2. Check Supabase
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data: sessionRows } = await supabase
+          .from('live_sessions')
+          .select('id')
+          .eq('quiz_id', quizId);
+
+        if (sessionRows && sessionRows.length > 0) {
+          const sessionIds = sessionRows.map((s: any) => s.id);
+
+          let query = supabase
+            .from('participants')
+            .select('id, session_id, status, roll_no, email')
+            .in('session_id', sessionIds);
+
+          if (cleanRoll && cleanEmail) {
+            query = query.or(`roll_no.ilike.${cleanRoll},email.ilike.${cleanEmail}`);
+          } else if (cleanRoll) {
+            query = query.ilike('roll_no', cleanRoll);
+          } else if (cleanEmail) {
+            query = query.ilike('email', cleanEmail);
+          }
+
+          const { data: matchingParticipants } = await query;
+
+          if (matchingParticipants && matchingParticipants.length > 0) {
+            for (const p of matchingParticipants) {
+              if (p.status === 'COMPLETED' || p.status === 'completed') return true;
+
+              const { count } = await supabase
+                .from('answers')
+                .select('*', { count: 'exact', head: true })
+                .eq('session_id', p.session_id)
+                .eq('participant_id', p.id);
+
+              if (count !== null && count >= totalQuestions) {
+                return true;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase hasParticipantCompletedQuiz check warning:', err);
+      }
+    }
+
+    return false;
   }
 
   // Leaderboard Calculation (Server-Authoritative Tie Breaking: Points DESC, Total Response Time ASC)

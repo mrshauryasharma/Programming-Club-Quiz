@@ -8,7 +8,7 @@ export type SessionState =
 
 export type SessionStatus = 'waiting' | 'active' | 'completed';
 
-export type ParticipantStatus = 'active' | 'warning_1' | 'warning_2' | 'removed';
+export type ParticipantStatus = 'active' | 'warning_1' | 'warning_2' | 'removed' | 'completed';
 
 export interface Question {
   id: string;
