@@ -82,9 +82,32 @@ class QuizRepository {
     const supabase = getSupabaseServerClient();
     if (supabase) {
       const { data, error } = await supabase.from('quizzes').select('*').order('created_at', { ascending: false });
-      if (!error && data && data.length > 0) return data as Quiz[];
+      if (!error && data && data.length > 0) {
+        // Query question count for each quiz
+        const { data: qData } = await supabase.from('questions').select('id, quiz_id');
+        const countMap = new Map<string, number>();
+        (qData || []).forEach((q: any) => {
+          countMap.set(q.quiz_id, (countMap.get(q.quiz_id) || 0) + 1);
+        });
+
+        return data.map((quiz: any) => {
+          const count = countMap.get(quiz.id) ?? (this.questions.get(quiz.id)?.length || 0);
+          return {
+            ...quiz,
+            question_count: count,
+            questions: new Array(count).fill(null),
+          } as Quiz;
+        });
+      }
     }
-    return Array.from(this.quizzes.values());
+    return Array.from(this.quizzes.values()).map((q) => {
+      const qs = this.questions.get(q.id) || q.questions || [];
+      return {
+        ...q,
+        question_count: qs.length,
+        questions: qs,
+      };
+    });
   }
 
   public async getQuizById(id: string): Promise<Quiz | null> {
@@ -203,6 +226,110 @@ class QuizRepository {
     this.questions.set(id, questionList);
 
     return { ...newQuiz, questions: questionList };
+  }
+
+  public async updateQuiz(
+    id: string,
+    quizData: Partial<Pick<Quiz, 'title' | 'description'>>,
+    questions?: Omit<Question, 'id' | 'quiz_id'>[]
+  ): Promise<Quiz> {
+    const supabase = getSupabaseServerClient();
+
+    if (supabase) {
+      try {
+        const updatePayload: any = {
+          updated_at: new Date().toISOString(),
+        };
+        if (quizData.title !== undefined) updatePayload.title = quizData.title.trim();
+        if (quizData.description !== undefined) updatePayload.description = quizData.description.trim();
+
+        const { data: updatedQuiz, error: qzErr } = await supabase
+          .from('quizzes')
+          .update(updatePayload)
+          .eq('id', id)
+          .select()
+          .single();
+
+        if (!qzErr && updatedQuiz) {
+          let mappedQuestions: Question[] = [];
+
+          if (questions && Array.isArray(questions)) {
+            // Delete old questions
+            await supabase.from('questions').delete().eq('quiz_id', id);
+
+            // Insert updated questions
+            const questionsPayload = questions.map((q, idx) => ({
+              quiz_id: id,
+              text: q.question_text,
+              options: q.options,
+              correct_option: q.correct_option_index,
+              points: 2, // Strictly 2 points per rule
+              time_limit: Math.min(120, Math.max(10, q.timer_seconds)),
+              order_num: idx,
+              question_type: 'MCQ',
+            }));
+
+            const { data: qResult } = await supabase.from('questions').insert(questionsPayload).select();
+
+            mappedQuestions = (qResult || []).map((row: any) => ({
+              id: row.id,
+              quiz_id: id,
+              question_text: row.text,
+              options: row.options,
+              correct_option_index: row.correct_option,
+              timer_seconds: row.time_limit,
+              order_index: row.order_num,
+            }));
+          } else {
+            mappedQuestions = (await this.getQuizById(id))?.questions || [];
+          }
+
+          const fullQuiz: Quiz = {
+            id,
+            title: updatedQuiz.title,
+            description: updatedQuiz.description,
+            created_at: updatedQuiz.created_at,
+            updated_at: updatedQuiz.updated_at,
+            questions: mappedQuestions,
+            question_count: mappedQuestions.length,
+          };
+
+          this.quizzes.set(id, fullQuiz);
+          this.questions.set(id, mappedQuestions);
+          return fullQuiz;
+        }
+      } catch (err) {
+        console.warn('Supabase updateQuiz fallback to in-memory:', err);
+      }
+    }
+
+    // In-memory fallback
+    const existing = this.quizzes.get(id);
+    if (!existing) throw new Error('Quiz not found');
+
+    const updatedQuiz: Quiz = {
+      ...existing,
+      ...quizData,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (questions) {
+      const updatedQuestions: Question[] = questions.map((q, idx) => ({
+        ...q,
+        id: `q-${id}-${idx}-${Date.now()}`,
+        quiz_id: id,
+        order_index: idx,
+      }));
+      this.questions.set(id, updatedQuestions);
+      updatedQuiz.questions = updatedQuestions;
+      updatedQuiz.question_count = updatedQuestions.length;
+    } else {
+      updatedQuiz.questions = this.questions.get(id) || [];
+      updatedQuiz.question_count = updatedQuiz.questions.length;
+    }
+
+    this.quizzes.set(id, updatedQuiz);
+    return updatedQuiz;
   }
 
   public async deleteQuiz(id: string): Promise<boolean> {

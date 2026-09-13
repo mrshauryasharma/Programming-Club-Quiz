@@ -15,6 +15,8 @@ import {
   BarChart3,
   Trash2,
   ExternalLink,
+  Pencil,
+  Edit3,
 } from 'lucide-react';
 
 export default function OrganizerDashboardPage() {
@@ -172,13 +174,22 @@ export default function OrganizerDashboardPage() {
                     <h3 className="text-base font-bold text-brand-navy dark:text-white leading-snug">
                       {quiz.title}
                     </h3>
-                    <button
-                      onClick={() => handleDeleteQuiz(quiz.id)}
-                      className="text-slate-400 hover:text-rose-500 p-1 transition-colors"
-                      title="Delete quiz"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <Link
+                        href={`/organizer/quizzes/${quiz.id}/edit`}
+                        className="text-slate-400 hover:text-brand-purple p-1.5 rounded-lg hover:bg-brand-purple/10 transition-colors"
+                        title="Edit quiz"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteQuiz(quiz.id)}
+                        className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        title="Delete quiz"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   <p className="text-xs text-slate-500 dark:text-brand-slate line-clamp-2 mb-4 leading-relaxed">
                     {quiz.description || 'USICT GBU Programming Club Technical Quiz'}
@@ -186,28 +197,39 @@ export default function OrganizerDashboardPage() {
 
                   <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-6">
                     <span className="font-semibold text-brand-purple">
-                      {quiz.questions?.length || 5} Questions
+                      {quiz.question_count ?? quiz.questions?.length ?? 0} Questions
                     </span>
                     <span>•</span>
                     <span>Created {new Date(quiz.created_at).toLocaleDateString()}</span>
                   </div>
                 </div>
 
-                {/* Host Live Button */}
-                <button
-                  onClick={() => handleStartLiveQuiz(quiz.id)}
-                  disabled={startingSessionId === quiz.id}
-                  className="w-full py-3 px-4 rounded-xl font-bold text-xs bg-gradient-to-r from-brand-purple to-brand-indigo hover:from-[#6A1694] hover:to-[#2F2766] text-white flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
-                >
-                  {startingSessionId === quiz.id ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 fill-white" />
-                      <span>START LIVE QUIZ</span>
-                    </>
-                  )}
-                </button>
+                {/* Host Live & Edit Buttons */}
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/organizer/quizzes/${quiz.id}/edit`}
+                    className="py-3 px-3.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-slate-700 hover:border-brand-purple/50 bg-slate-50 dark:bg-slate-800/60 hover:bg-brand-purple/10 text-slate-700 dark:text-slate-200 hover:text-brand-purple flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                    title="Edit Questions & Settings"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span>EDIT</span>
+                  </Link>
+
+                  <button
+                    onClick={() => handleStartLiveQuiz(quiz.id)}
+                    disabled={startingSessionId === quiz.id}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold text-xs bg-gradient-to-r from-brand-purple to-brand-indigo hover:from-[#6A1694] hover:to-[#2F2766] text-white flex items-center justify-center gap-2 shadow-md transition-all active:scale-[0.98] cursor-pointer"
+                  >
+                    {startingSessionId === quiz.id ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Play className="w-4 h-4 fill-white" />
+                        <span>START LIVE QUIZ</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             ))}
           </div>

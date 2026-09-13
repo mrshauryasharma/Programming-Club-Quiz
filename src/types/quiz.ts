@@ -36,6 +36,7 @@ export interface Quiz {
   created_at: string;
   updated_at: string;
   questions?: Question[];
+  question_count?: number;
 }
 
 export interface Session {
