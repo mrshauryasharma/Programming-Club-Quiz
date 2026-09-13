@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PDFParse } from 'pdf-parse';
+import zlib from 'zlib';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -61,20 +61,76 @@ function parseMCQsFromText(text: string): ExtractedMCQ[] {
   return questions;
 }
 
-// Fallback plain text stream extractor for raw PDF buffers
-function extractRawTextFromBuffer(buffer: Buffer): string {
-  try {
-    const latin = buffer.toString('latin1');
-    const matches = latin.match(/\(([^()]{2,})\)/g);
-    if (matches && matches.length > 5) {
-      return matches.map(m => m.slice(1, -1)).join(' ');
+// Pure JavaScript PDF text extractor (Edge, Node, Cloudflare, Serverless 100% compatible)
+function extractTextFromPdfBuffer(buffer: Buffer): string {
+  let fullText = '';
+  const bufferString = buffer.toString('binary');
+
+  // Find all stream ... endstream blocks
+  const streamRegex = /stream\r?\n([\s\S]*?)\r?\nendstream/g;
+  let match;
+
+  while ((match = streamRegex.exec(bufferString)) !== null) {
+    const streamContent = match[1];
+    const streamBuffer = Buffer.from(streamContent, 'binary');
+
+    let decompressed: Buffer | null = null;
+    try {
+      decompressed = zlib.inflateSync(streamBuffer);
+    } catch {
+      try {
+        decompressed = zlib.inflateRawSync(streamBuffer);
+      } catch {
+        decompressed = streamBuffer;
+      }
     }
-  } catch {}
-  return '';
+
+    if (decompressed) {
+      const textChunk = decompressed.toString('latin1');
+
+      // 1. Match TJ arrays: [(text) 10 (text)] TJ
+      const tjArrayRegex = /\[((?:\(.*?\)|[^\]])+)\]\s*TJ/g;
+      let tjMatch;
+      while ((tjMatch = tjArrayRegex.exec(textChunk)) !== null) {
+        const parts = tjMatch[1].match(/\((.*?)\)/g);
+        if (parts) {
+          fullText += parts.map(p => p.slice(1, -1)).join('') + ' ';
+        }
+      }
+
+      // 2. Match simple (text) Tj
+      const tjSimpleRegex = /\((.*?)\)\s*Tj/g;
+      let simpleMatch;
+      while ((simpleMatch = tjSimpleRegex.exec(textChunk)) !== null) {
+        fullText += simpleMatch[1] + '\n';
+      }
+
+      // 3. Match ' or "
+      const quoteRegex = /\((.*?)\)\s*['"]/g;
+      let quoteMatch;
+      while ((quoteMatch = quoteRegex.exec(textChunk)) !== null) {
+        fullText += quoteMatch[1] + '\n';
+      }
+    }
+  }
+
+  // 4. Fallback if streams didn't yield text
+  if (!fullText.trim()) {
+    const rawMatches = bufferString.match(/\(([^()]{2,})\)/g);
+    if (rawMatches) {
+      fullText = rawMatches.map(m => m.slice(1, -1)).join(' ');
+    }
+  }
+
+  return fullText
+    .replace(/\\([()\\])/g, '$1')
+    .replace(/\\r/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, ' ')
+    .trim();
 }
 
 export async function POST(req: NextRequest) {
-  let parserInstance: any = null;
   try {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
@@ -86,25 +142,8 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Extract text using PDFParse
-    let rawText = '';
-    try {
-      parserInstance = new PDFParse({ data: buffer });
-      await parserInstance.load();
-      const parsed = await parserInstance.getText();
-      rawText = parsed?.text || '';
-    } catch (e: any) {
-      console.warn('PDFParse load error, attempting fallback stream reader:', e);
-      rawText = extractRawTextFromBuffer(buffer);
-    } finally {
-      if (parserInstance?.destroy) {
-        await parserInstance.destroy().catch(() => {});
-      }
-    }
-
-    if (!rawText || !rawText.trim()) {
-      rawText = extractRawTextFromBuffer(buffer);
-    }
+    // Extract text using pure JS stream extractor
+    const rawText = extractTextFromPdfBuffer(buffer);
 
     if (!rawText || !rawText.trim()) {
       return NextResponse.json(
