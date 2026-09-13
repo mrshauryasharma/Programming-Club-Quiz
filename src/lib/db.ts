@@ -447,73 +447,80 @@ class QuizRepository {
     if (!code) return null;
     const trimmed = code.trim();
     const normalizedCode = trimmed.toUpperCase();
-    const session = this.sessions.get(normalizedCode) || this.sessions.get(trimmed);
-    if (session) return session;
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      let { data } = await supabase
-        .from('live_sessions')
-        .select('*')
-        .eq('game_code', normalizedCode)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!data && /^[0-9a-fA-F-]{36}$/.test(trimmed)) {
-        const res = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
-        data = res.data;
-      }
-      if (data) {
-        const s: Session = {
-          id: data.id,
-          quiz_id: data.quiz_id,
-          game_code: data.game_code,
-          status: (data.status?.toLowerCase() || 'waiting') as any,
-          current_question_index: data.current_question_index || 0,
-          question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
-          current_state: (data.current_state || 'WAITING') as any,
-          created_at: data.created_at,
-          ended_at: data.ended_at,
-        };
-        this.sessions.set(s.id, s);
-        this.sessions.set(s.game_code, s);
-        return s;
+      try {
+        let { data } = await supabase
+          .from('live_sessions')
+          .select('*')
+          .eq('game_code', normalizedCode)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!data && /^[0-9a-fA-F-]{36}$/.test(trimmed)) {
+          const res = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
+          data = res.data;
+        }
+        if (data) {
+          const s: Session = {
+            id: data.id,
+            quiz_id: data.quiz_id,
+            game_code: data.game_code,
+            status: (data.status?.toLowerCase() || 'waiting') as any,
+            current_question_index: data.current_question_index || 0,
+            question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
+            current_state: (data.current_state || 'WAITING') as any,
+            created_at: data.created_at,
+            ended_at: data.ended_at,
+          };
+          this.sessions.set(s.id, s);
+          this.sessions.set(s.game_code, s);
+          return s;
+        }
+      } catch (err) {
+        console.warn('Supabase getSessionByCode fetch error, falling back to memory:', err);
       }
     }
-    return null;
+
+    // Fallback to in-memory store
+    return this.sessions.get(normalizedCode) || this.sessions.get(trimmed) || null;
   }
 
   public async getSessionById(id: string): Promise<Session | null> {
     if (!id) return null;
     const trimmed = id.trim();
-    const session = this.sessions.get(trimmed) || this.sessions.get(trimmed.toUpperCase());
-    if (session) return session;
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      let { data } = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
-      if (!data && trimmed.length === 6) {
-        const res = await supabase.from('live_sessions').select('*').eq('game_code', trimmed.toUpperCase()).maybeSingle();
-        data = res.data;
-      }
-      if (data) {
-        const s: Session = {
-          id: data.id,
-          quiz_id: data.quiz_id,
-          game_code: data.game_code,
-          status: (data.status?.toLowerCase() || 'waiting') as any,
-          current_question_index: data.current_question_index || 0,
-          question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
-          current_state: (data.current_state || 'WAITING') as any,
-          created_at: data.created_at,
-          ended_at: data.ended_at,
-        };
-        this.sessions.set(s.id, s);
-        this.sessions.set(s.game_code, s);
-        return s;
+      try {
+        let { data } = await supabase.from('live_sessions').select('*').eq('id', trimmed).maybeSingle();
+        if (!data && trimmed.length === 6) {
+          const res = await supabase.from('live_sessions').select('*').eq('game_code', trimmed.toUpperCase()).maybeSingle();
+          data = res.data;
+        }
+        if (data) {
+          const s: Session = {
+            id: data.id,
+            quiz_id: data.quiz_id,
+            game_code: data.game_code,
+            status: (data.status?.toLowerCase() || 'waiting') as any,
+            current_question_index: data.current_question_index || 0,
+            question_start_time: data.question_start_time ? Number(data.question_start_time) : null,
+            current_state: (data.current_state || 'WAITING') as any,
+            created_at: data.created_at,
+            ended_at: data.ended_at,
+          };
+          this.sessions.set(s.id, s);
+          this.sessions.set(s.game_code, s);
+          return s;
+        }
+      } catch (err) {
+        console.warn('Supabase getSessionById fetch error, falling back to memory:', err);
       }
     }
-    return null;
+
+    return this.sessions.get(trimmed) || this.sessions.get(trimmed.toUpperCase()) || null;
   }
 
   // Delete a specific live quiz event/session strictly scoped to this session ID

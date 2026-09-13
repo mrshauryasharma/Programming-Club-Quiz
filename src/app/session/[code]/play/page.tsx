@@ -211,8 +211,13 @@ export default function ParticipantPlayPage() {
 
   const fetchCurrentState = useCallback(async () => {
     try {
-      const query = participantId ? `?participant_id=${encodeURIComponent(participantId)}` : '';
-      const res = await fetch(`/api/sessions/${code}/state${query}`);
+      const pParam = participantId ? `participant_id=${encodeURIComponent(participantId)}` : '';
+      const tParam = `_t=${Date.now()}`;
+      const queryStr = `?${[pParam, tParam].filter(Boolean).join('&')}`;
+      const res = await fetch(`/api/sessions/${code}/state${queryStr}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+      });
       if (!res.ok) return;
       const data = await res.json();
       setSessionState(data.session);

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { checkAndAdvanceIfExpired } from '@/lib/sessionTimer';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest, context: { params: Promise<{ code: string }> }) {
   try {
     const { code } = await context.params;

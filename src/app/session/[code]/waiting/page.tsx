@@ -38,22 +38,32 @@ export default function WaitingRoomPage() {
     setParticipantName(storedName || 'Participant');
 
     // Network status listeners (disconnection is NOT cheating)
-    const handleOnline = () => setIsConnected(true);
+    const handleOnline = () => {
+      setIsConnected(true);
+      fetchState();
+    };
     const handleOffline = () => setIsConnected(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Initial state fetch
+    // Immediate state fetch with cache-busting
     const fetchState = async () => {
       try {
-        const res = await fetch(`/api/sessions/${code}/state`);
+        const res = await fetch(`/api/sessions/${code}/state?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
+        });
         if (!res.ok) throw new Error('Session not found');
         const data = await res.json();
         setSessionData(data);
 
-        // If quiz has already started or is active, redirect to play screen
-        if (data.session.current_state === 'QUESTION_ACTIVE') {
+        // If quiz has started (any non-waiting state or active status), immediately redirect to play screen
+        const currentState = data.session?.current_state;
+        const status = data.session?.status?.toLowerCase();
+        const isStarted = (currentState && currentState !== 'WAITING') || status === 'active' || status === 'completed';
+
+        if (isStarted) {
           router.push(`/session/${code}/play`);
         }
       } catch (err: any) {
@@ -62,7 +72,17 @@ export default function WaitingRoomPage() {
     };
 
     fetchState();
-    const interval = setInterval(fetchState, 2500);
+    // Fast polling: 1500ms ensures instant pickup if WebSocket or SSE is throttled
+    const interval = setInterval(fetchState, 1500);
+
+    // Wakeup listener when tab or screen is focused after waiting in background
+    const handleWakeup = () => {
+      if (document.visibilityState === 'visible') {
+        fetchState();
+      }
+    };
+    document.addEventListener('visibilitychange', handleWakeup);
+    window.addEventListener('focus', handleWakeup);
 
     // Supabase Realtime channel subscription
     const supabase = getSupabaseBrowserClient();
@@ -75,7 +95,8 @@ export default function WaitingRoomPage() {
           router.push(`/session/${code}/play`);
         })
         .on('broadcast', { event: 'STATE_CHANGE' }, (payload: any) => {
-          if (payload.payload?.current_state === 'QUESTION_ACTIVE') {
+          const st = payload.payload?.current_state;
+          if (st && st !== 'WAITING') {
             router.push(`/session/${code}/play`);
           }
         })
@@ -90,7 +111,7 @@ export default function WaitingRoomPage() {
     eventSource.addEventListener('STATE_CHANGE', (e) => {
       try {
         const data = JSON.parse(e.data);
-        if (data.current_state === 'QUESTION_ACTIVE') {
+        if (data.current_state && data.current_state !== 'WAITING') {
           router.push(`/session/${code}/play`);
         }
       } catch (err) {}
@@ -100,6 +121,8 @@ export default function WaitingRoomPage() {
       clearInterval(interval);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleWakeup);
+      window.removeEventListener('focus', handleWakeup);
       if (channel && supabase) supabase.removeChannel(channel);
       eventSource.close();
     };
