@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PDFParse } from 'pdf-parse';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
+
 interface ExtractedMCQ {
   question_text: string;
   options: string[];
@@ -8,56 +11,46 @@ interface ExtractedMCQ {
   timer_seconds: number;
 }
 
-// Regex fallback parser for standard MCQ documents
+// Regex parser supporting diverse MCQ document formats
 function parseMCQsFromText(text: string): ExtractedMCQ[] {
   const questions: ExtractedMCQ[] = [];
   
-  // Clean up text
+  // Clean up text and normalize line breaks
   const clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
   
-  // Split on question numbers like "1.", "Q1.", "Question 1:", "1)"
-  const qBlocks = clean.split(/(?:^|\n)(?:Q(?:uestion)?\s*)?(\d+)[\.\:\)]\s+/i);
+  // Split on question numbers like "1.", "Q1.", "Question 1:", "1)", "1 -", "Q.1"
+  const qBlocks = clean.split(/(?:^|\n)\s*(?:Q(?:uestion)?[\s\.\:\-]*)?(\d+)[\.\:\)\-]\s+/i);
   
-  // qBlocks[0] is header/preamble, then pairs of [number, content]
   for (let i = 1; i < qBlocks.length; i += 2) {
-    const qNum = qBlocks[i];
     const block = qBlocks[i + 1];
     if (!block) continue;
 
-    // Extract options A, B, C, D
-    const optMatch = block.match(/(?:^|\n)\s*\(?[A-a]\)?[.\s]+([\s\S]*?)(?:^|\n)\s*\(?[B-b]\)?[.\s]+([\s\S]*?)(?:^|\n)\s*\(?[C-c]\)?[.\s]+([\s\S]*?)(?:^|\n)\s*\(?[D-d]\)?[.\s]+([\s\S]*?)(?=(?:^|\n)\s*(?:Ans|Answer|\d+[\.\)]|$))/i);
+    // Match options A, B, C, D in formats like A) / (A) / A. / a) / (a) / a.
+    const optRegex = /(?:^|\n|\s)\(?[A-a]\)?[.\:\)]\s+([\s\S]*?)(?:^|\n|\s)\(?[B-b]\)?[.\:\)]\s+([\s\S]*?)(?:^|\n|\s)\(?[C-c]\)?[.\:\)]\s+([\s\S]*?)(?:^|\n|\s)\(?[D-d]\)?[.\:\)]\s+([\s\S]*?)(?=(?:^|\n)\s*(?:Ans(?:wer)?|Correct(?:\s*Option)?|Key|\d+[\.\:\)\-]|$))/i;
+    const optMatch = block.match(optRegex);
     
     if (optMatch) {
-      // Question text is everything before option A
-      const questionText = block.slice(0, optMatch.index).trim();
-      const optA = optMatch[1].trim();
-      const optB = optMatch[2].trim();
-      const optC = optMatch[3].trim();
-      let optD = optMatch[4].trim();
+      const questionText = block.slice(0, optMatch.index).replace(/\n+/g, ' ').trim();
+      const optA = optMatch[1].replace(/\n+/g, ' ').trim();
+      const optB = optMatch[2].replace(/\n+/g, ' ').trim();
+      const optC = optMatch[3].replace(/\n+/g, ' ').trim();
+      let optD = optMatch[4].replace(/\n+/g, ' ').trim();
 
       // Check for answer key in optD or remainder
       let correctIdx = 0;
-      const ansMatch = block.match(/(?:Ans|Answer)[\s\:\-]+([A-Da-d])/i);
+      const ansMatch = block.match(/(?:Ans(?:wer)?|Correct(?:\s*Option)?|Key)[\s\:\-]+([A-Da-d])/i);
       if (ansMatch) {
         const letter = ansMatch[1].toUpperCase();
-        if (letter === 'A') correctIdx = 0;
-        else if (letter === 'B') correctIdx = 1;
-        else if (letter === 'C') correctIdx = 2;
-        else if (letter === 'D') correctIdx = 3;
+        correctIdx = { A: 0, B: 1, C: 2, D: 3 }[letter] ?? 0;
 
         // Clean optD if it contained the answer string
-        optD = optD.replace(/(?:Ans|Answer)[\s\:\-]+[A-Da-d][\s\S]*/i, '').trim();
+        optD = optD.replace(/(?:Ans(?:wer)?|Correct(?:\s*Option)?|Key)[\s\:\-]+[A-Da-d][\s\S]*/i, '').trim();
       }
 
       if (questionText && optA && optB && optC && optD) {
         questions.push({
-          question_text: questionText.replace(/\n+/g, ' ').trim(),
-          options: [
-            optA.replace(/\n+/g, ' ').trim(),
-            optB.replace(/\n+/g, ' ').trim(),
-            optC.replace(/\n+/g, ' ').trim(),
-            optD.replace(/\n+/g, ' ').trim(),
-          ],
+          question_text: questionText,
+          options: [optA, optB, optC, optD],
           correct_option_index: correctIdx,
           timer_seconds: 30,
         });
@@ -66,6 +59,18 @@ function parseMCQsFromText(text: string): ExtractedMCQ[] {
   }
 
   return questions;
+}
+
+// Fallback plain text stream extractor for raw PDF buffers
+function extractRawTextFromBuffer(buffer: Buffer): string {
+  try {
+    const latin = buffer.toString('latin1');
+    const matches = latin.match(/\(([^()]{2,})\)/g);
+    if (matches && matches.length > 5) {
+      return matches.map(m => m.slice(1, -1)).join(' ');
+    }
+  } catch {}
+  return '';
 }
 
 export async function POST(req: NextRequest) {
@@ -89,18 +94,26 @@ export async function POST(req: NextRequest) {
       const parsed = await parserInstance.getText();
       rawText = parsed?.text || '';
     } catch (e: any) {
-      return NextResponse.json({ error: `Failed to read PDF text: ${e.message || 'Corrupted or unreadable PDF'}` }, { status: 400 });
+      console.warn('PDFParse load error, attempting fallback stream reader:', e);
+      rawText = extractRawTextFromBuffer(buffer);
     } finally {
       if (parserInstance?.destroy) {
         await parserInstance.destroy().catch(() => {});
       }
     }
 
-    if (!rawText.trim()) {
-      return NextResponse.json({ error: 'Could not extract any text from this PDF. Please ensure it contains selectable text.' }, { status: 400 });
+    if (!rawText || !rawText.trim()) {
+      rawText = extractRawTextFromBuffer(buffer);
     }
 
-    // Try Meta AI first if API key is present
+    if (!rawText || !rawText.trim()) {
+      return NextResponse.json(
+        { error: 'Could not extract text from this PDF. Please ensure the PDF contains selectable text (not scanned images).' },
+        { status: 400 }
+      );
+    }
+
+    // Try Meta AI first if configured (with strict 3.5s timeout)
     const metaApiKey = process.env.META_AI_API_KEY;
     if (metaApiKey) {
       try {
@@ -142,6 +155,7 @@ ${rawText.slice(0, 10000)}`;
             messages: [{ role: 'user', content: prompt }],
             temperature: 0.3,
           }),
+          signal: AbortSignal.timeout(3500),
         });
 
         if (aiRes.ok) {
@@ -159,11 +173,11 @@ ${rawText.slice(0, 10000)}`;
           }
         }
       } catch (err) {
-        console.warn('Meta AI extraction failed, falling back to regex parser:', err);
+        console.warn('Meta AI extraction skipped or timed out, using local parser:', err);
       }
     }
 
-    // Fallback parser if Meta AI is unconfigured or failed
+    // Local smart parser
     const fallbackQuestions = parseMCQsFromText(rawText);
 
     if (fallbackQuestions.length > 0) {
@@ -175,11 +189,18 @@ ${rawText.slice(0, 10000)}`;
       });
     }
 
-    return NextResponse.json({
-      error: 'Could not detect structured MCQs in this PDF. Please verify the PDF contains numbered questions with options A, B, C, D.',
-    }, { status: 422 });
+    return NextResponse.json(
+      {
+        error: 'No structured MCQs could be detected. Please ensure questions are numbered (e.g. 1., 2.) with options A, B, C, D.',
+      },
+      { status: 422 }
+    );
 
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Internal error scanning PDF' }, { status: 500 });
+    console.error('Unhandled scan-pdf error:', err);
+    return NextResponse.json(
+      { error: err.message || 'Internal error scanning PDF file' },
+      { status: 500 }
+    );
   }
 }

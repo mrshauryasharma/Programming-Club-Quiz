@@ -208,10 +208,10 @@ export default function ParticipantPlayPage() {
     };
   }, [code, router, reportViolation]);
 
-  // Poll state and sync with Supabase Realtime
   const fetchCurrentState = useCallback(async () => {
     try {
-      const res = await fetch(`/api/sessions/${code}/state`);
+      const query = participantId ? `?participant_id=${encodeURIComponent(participantId)}` : '';
+      const res = await fetch(`/api/sessions/${code}/state${query}`);
       if (!res.ok) return;
       const data = await res.json();
       setSessionState(data.session);
@@ -264,7 +264,7 @@ export default function ParticipantPlayPage() {
 
   useEffect(() => {
     fetchCurrentState();
-    const interval = setInterval(fetchCurrentState, 2000);
+    const interval = setInterval(fetchCurrentState, 3000);
 
     // Supabase Realtime Channel
     const supabase = getSupabaseBrowserClient();

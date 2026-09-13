@@ -191,12 +191,19 @@ export default function CreateQuizPage() {
         body: formData,
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to extract questions from PDF');
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        throw new Error(text || `Server returned non-JSON error (Status ${res.status}). Please try again.`);
       }
 
-      if (data.questions && data.questions.length > 0) {
+      if (!res.ok) {
+        throw new Error(data?.error || `Failed to extract questions from PDF (Status ${res.status})`);
+      }
+
+      if (data?.questions && data.questions.length > 0) {
         setQuestions(data.questions);
         if (data.title && (!title || title.trim() === '')) {
           setTitle(data.title);
@@ -204,7 +211,7 @@ export default function CreateQuizPage() {
         setShowPdfModal(false);
         setPdfFile(null);
       } else {
-        throw new Error('No valid MCQs could be extracted from this PDF.');
+        throw new Error('No valid MCQs could be extracted from this PDF. Please check that the questions are numbered with options A, B, C, D.');
       }
     } catch (err: any) {
       setPdfError(err.message || 'Error processing PDF');

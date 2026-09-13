@@ -9,6 +9,8 @@ class QuizRepository {
   private participants: Map<string, Participant[]> = new Map();
   private answers: Map<string, Answer[]> = new Map();
   private securityLogs: Map<string, SecurityLog[]> = new Map();
+  private sessionCacheTimes: Map<string, number> = new Map();
+  private participantCacheTimes: Map<string, number> = new Map();
 
   constructor() {
     this.seedDefaultQuiz();
@@ -86,9 +88,14 @@ class QuizRepository {
   }
 
   public async getQuizById(id: string): Promise<Quiz | null> {
+    const cached = this.quizzes.get(id);
+    if (cached && cached.questions && cached.questions.length > 0) {
+      return cached;
+    }
+
     const supabase = getSupabaseServerClient();
     if (supabase) {
-      const { data, error } = await supabase.from('quizzes').select('*').eq('id', id).single();
+      const { data, error } = await supabase.from('quizzes').select('*').eq('id', id).maybeSingle();
       if (!error && data) {
         // Query existing questions table using existing columns: text, correct_option, time_limit, order_num
         const { data: qData } = await supabase
@@ -107,7 +114,10 @@ class QuizRepository {
           order_index: row.order_num ?? row.order_index ?? 0,
         }));
 
-        return { ...(data as Quiz), questions: mappedQuestions };
+        const fullQuiz: Quiz = { ...(data as Quiz), questions: mappedQuestions };
+        this.quizzes.set(id, fullQuiz);
+        this.questions.set(id, mappedQuestions);
+        return fullQuiz;
       }
     }
     const quiz = this.quizzes.get(id);
@@ -543,11 +553,20 @@ class QuizRepository {
   }
 
   public async getParticipants(sessionId: string): Promise<Participant[]> {
+    const cached = this.participants.get(sessionId);
+    const lastFetch = this.participantCacheTimes.get(sessionId) || 0;
+    const now = Date.now();
+
+    // High speed cache: serve from memory if fetched in the last 2500ms
+    if (cached && cached.length > 0 && (now - lastFetch < 2500)) {
+      return cached;
+    }
+
     const supabase = getSupabaseServerClient();
     if (supabase) {
       const { data } = await supabase.from('participants').select('*').eq('session_id', sessionId);
       if (data && data.length > 0) {
-        return data.map((p: any) => ({
+        const mapped = data.map((p: any) => ({
           id: p.id,
           session_id: p.session_id,
           name: p.name || p.nickname || 'Student',
@@ -562,6 +581,9 @@ class QuizRepository {
           total_response_time_ms: Number(p.total_response_time_ms || 0),
           joined_at: p.joined_at,
         }));
+        this.participants.set(sessionId, mapped);
+        this.participantCacheTimes.set(sessionId, now);
+        return mapped;
       }
     }
     return this.participants.get(sessionId) || [];

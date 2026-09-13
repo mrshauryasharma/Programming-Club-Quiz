@@ -79,7 +79,7 @@ export default function ProjectorViewPage() {
         setTimerRemainingSec(Math.ceil(data.activeQuestion.remaining_ms / 1000));
       }
 
-      if (data.session.current_state === 'FINAL_RESULTS') {
+      if (data.session.current_state === 'FINAL_RESULTS' || data.session.current_state === 'COMPLETED') {
         confetti({ particleCount: 150, spread: 90, origin: { y: 0.5 } });
       }
     } catch (e) {}
@@ -87,7 +87,7 @@ export default function ProjectorViewPage() {
 
   useEffect(() => {
     fetchProjectorState();
-    const interval = setInterval(fetchProjectorState, 2000);
+    const interval = setInterval(fetchProjectorState, 3000);
 
     // Supabase Realtime Channel
     const supabase = getSupabaseBrowserClient();

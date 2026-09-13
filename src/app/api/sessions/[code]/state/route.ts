@@ -16,6 +16,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
     // Authoritative check: Automatically advance if timer expired
     session = await checkAndAdvanceIfExpired(session);
 
+    const { searchParams } = new URL(req.url);
+    const includeParticipants = searchParams.get('include_participants') === 'true';
+    const participantId = searchParams.get('participant_id');
+
     const quiz = await db.getQuizById(session.quiz_id);
     const participants = await db.getParticipants(session.id);
 
@@ -65,25 +69,41 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       total_questions: quiz?.questions?.length || 0,
     }));
 
+    // Efficient payload: send full participant list only if explicitly requested (e.g. Organizer)
+    let filteredParticipants = participants;
+    if (!includeParticipants) {
+      if (participantId) {
+        filteredParticipants = participants.filter(p => p.id === participantId);
+      } else {
+        filteredParticipants = [];
+      }
+    }
+
+    const mappedParticipants = filteredParticipants.map(p => ({
+      id: p.id,
+      name: p.name,
+      roll_no: p.roll_no,
+      year: p.year,
+      department: p.department,
+      status: p.status,
+      warning_count: p.warning_count,
+      total_score: p.total_score,
+    }));
+
     return NextResponse.json({
       session,
       quiz_title: quiz?.title || 'Programming Club Quiz',
       total_questions: quiz?.questions?.length || 0,
       participant_count: participants.length,
-      participants: participants.map(p => ({
-        id: p.id,
-        name: p.name,
-        roll_no: p.roll_no,
-        year: p.year,
-        department: p.department,
-        status: p.status,
-        warning_count: p.warning_count,
-        total_score: p.total_score,
-      })),
+      participants: mappedParticipants,
       activeQuestion,
       questions: sanitizedQuestions,
       questionSummary,
       leaderboard,
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, max-age=0',
+      }
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to fetch session state' }, { status: 500 });

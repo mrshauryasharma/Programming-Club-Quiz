@@ -32,7 +32,7 @@ export default function OrganizerLiveSessionPage() {
 
   const fetchSessionState = useCallback(async () => {
     try {
-      const res = await fetch(`/api/sessions/${code}/state`);
+      const res = await fetch(`/api/sessions/${code}/state?include_participants=true`);
       if (!res.ok) return;
       const data = await res.json();
       setSessionData(data);
@@ -225,6 +225,23 @@ export default function OrganizerLiveSessionPage() {
                     </button>
                   )}
                 </>
+              )}
+
+              {/* Direct / Instant End Quiz Option */}
+              {currentState !== 'FINAL_RESULTS' && currentState !== 'COMPLETED' && (
+                <button
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to end the quiz right now? This will immediately conclude the session and finalize rankings.')) {
+                      handleAction('END_QUIZ');
+                    }
+                  }}
+                  disabled={loadingAction}
+                  className="px-4 py-2.5 rounded-xl font-bold text-xs bg-rose-500/10 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-500/30 flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer ml-auto sm:ml-0"
+                  title="Directly terminate the session and show final results"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>END QUIZ NOW</span>
+                </button>
               )}
 
               {(currentState === 'FINAL_RESULTS' || currentState === 'COMPLETED') && (
