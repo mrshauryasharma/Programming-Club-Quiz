@@ -731,7 +731,7 @@ class QuizRepository {
   // Live Quiz State Transitions (Server Authoritative)
   public async transitionSessionState(
     code: string,
-    action: 'START_QUESTION' | 'END_QUESTION' | 'SHOW_LEADERBOARD' | 'NEXT_QUESTION' | 'FINAL_RESULTS' | 'END_QUIZ'
+    action: 'START_QUIZ' | 'START_QUESTION' | 'END_QUESTION' | 'SHOW_LEADERBOARD' | 'NEXT_QUESTION' | 'FINAL_RESULTS' | 'END_QUIZ'
   ): Promise<Session> {
     const session = await this.getSessionByCode(code);
     if (!session) throw new Error('Session not found');
@@ -742,9 +742,11 @@ class QuizRepository {
     const now = Date.now();
 
     switch (action) {
+      case 'START_QUIZ':
       case 'START_QUESTION':
         session.status = 'active';
         session.current_state = 'QUESTION_ACTIVE';
+        session.current_question_index = 0;
         session.question_start_time = now;
         break;
 
@@ -769,13 +771,8 @@ class QuizRepository {
         break;
 
       case 'FINAL_RESULTS':
-        session.current_state = 'FINAL_RESULTS';
-        session.status = 'completed';
-        session.ended_at = new Date().toISOString();
-        break;
-
       case 'END_QUIZ':
-        session.current_state = 'COMPLETED';
+        session.current_state = 'FINAL_RESULTS';
         session.status = 'completed';
         session.ended_at = new Date().toISOString();
         break;
@@ -818,8 +815,8 @@ class QuizRepository {
     const session = await this.getSessionByCode(code);
     if (!session) throw new Error('Session not found');
 
-    if (session.current_state !== 'QUESTION_ACTIVE') {
-      throw new Error('Answers are not being accepted for this question');
+    if (session.status !== 'active' && session.current_state !== 'QUESTION_ACTIVE') {
+      throw new Error('This quiz session is not currently active and accepting answers');
     }
 
     const quiz = await this.getQuizById(session.quiz_id);
@@ -997,6 +994,85 @@ class QuizRepository {
       status: participant.status,
       is_removed: participant.status === 'removed',
     };
+  }
+
+  // Retrieve all question IDs answered by a specific participant in this session
+  public async getParticipantAnsweredQuestionIds(sessionId: string, participantId: string): Promise<string[]> {
+    const answeredIds = new Set<string>();
+
+    // 1. Check in-memory answers
+    const localAnswers = this.answers.get(sessionId) || [];
+    for (const a of localAnswers) {
+      if (a.participant_id === participantId) {
+        answeredIds.add(a.question_id);
+      }
+    }
+
+    // 2. Check Supabase answers table
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('answers')
+          .select('question_id')
+          .eq('session_id', sessionId)
+          .eq('participant_id', participantId);
+        if (data) {
+          for (const row of data) {
+            if (row.question_id) answeredIds.add(row.question_id);
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase getParticipantAnsweredQuestionIds warning:', err);
+      }
+    }
+
+    return Array.from(answeredIds);
+  }
+
+  // Get session overall participant progress (total joined and how many finished all questions)
+  public async getSessionProgress(sessionId: string, totalQuestions: number): Promise<{ total: number; completed: number }> {
+    const participants = await this.getParticipants(sessionId);
+    const total = participants.length;
+    let completed = 0;
+
+    const localAnswers = this.answers.get(sessionId) || [];
+    const answerCounts = new Map<string, Set<string>>();
+
+    for (const a of localAnswers) {
+      if (!answerCounts.has(a.participant_id)) {
+        answerCounts.set(a.participant_id, new Set());
+      }
+      answerCounts.get(a.participant_id)!.add(a.question_id);
+    }
+
+    // Also verify with Supabase if available
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('answers')
+          .select('participant_id, question_id')
+          .eq('session_id', sessionId);
+        if (data) {
+          for (const row of data) {
+            if (!answerCounts.has(row.participant_id)) {
+              answerCounts.set(row.participant_id, new Set());
+            }
+            answerCounts.get(row.participant_id)!.add(row.question_id);
+          }
+        }
+      } catch (err) {}
+    }
+
+    for (const p of participants) {
+      const answeredCount = answerCounts.get(p.id)?.size || 0;
+      if (totalQuestions > 0 && answeredCount >= totalQuestions) {
+        completed++;
+      }
+    }
+
+    return { total, completed };
   }
 
   // Leaderboard Calculation (Server-Authoritative Tie Breaking: Points DESC, Total Response Time ASC)

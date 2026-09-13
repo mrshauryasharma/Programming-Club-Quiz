@@ -27,6 +27,7 @@ export default function ProjectorViewPage() {
   const [questionSummary, setQuestionSummary] = useState<any>(null);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [participantCount, setParticipantCount] = useState(0);
+  const [progress, setProgress] = useState<{ total: number; completed: number }>({ total: 0, completed: 0 });
 
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -74,6 +75,7 @@ export default function ProjectorViewPage() {
       setQuestionSummary(data.questionSummary);
       setParticipantCount(data.participant_count || 0);
       if (data.leaderboard) setLeaderboard(data.leaderboard);
+      if (data.progress) setProgress(data.progress);
 
       if (data.activeQuestion?.remaining_ms !== undefined) {
         setTimerRemainingSec(Math.ceil(data.activeQuestion.remaining_ms / 1000));
@@ -209,52 +211,116 @@ export default function ProjectorViewPage() {
         )}
 
         {/* -------------------------------------------------------- */}
-        {/* 2. QUESTION ACTIVE STAGE (High Typography, Timer, Large Options) */}
+        {/* 2. QUESTION ACTIVE STAGE (Live Playground Room Standings) */}
         {/* -------------------------------------------------------- */}
-        {currentState === 'QUESTION_ACTIVE' && activeQuestion && (
-          <div className="max-w-5xl mx-auto space-y-6">
-            {/* Top Info Bar */}
-            <div className="flex items-center justify-between">
-              <div className="px-5 py-2 rounded-2xl bg-brand-purple/15 text-brand-purple font-extrabold text-sm sm:text-base border border-brand-purple/30">
-                QUESTION {activeQuestion.order_index + 1} OF {activeQuestion.total_questions}
+        {currentState === 'QUESTION_ACTIVE' && (
+          <div className="max-w-6xl mx-auto space-y-8">
+            {/* Top Live Banner */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl">
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-4 w-4">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
+                </span>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-black text-brand-navy dark:text-white uppercase tracking-tight">
+                    LIVE QUIZ IN PROGRESS
+                  </h2>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Students are answering questions live • Standings update in real time
+                  </p>
+                </div>
               </div>
 
-              {/* Giant Projector Countdown Timer */}
-              <div
-                className={`flex items-center gap-3 px-6 py-2.5 rounded-2xl font-mono font-black text-2xl sm:text-3xl shadow-lg transition-all ${
-                  timerRemainingSec <= 5
-                    ? 'bg-rose-600 text-white animate-pulse'
-                    : 'bg-white dark:bg-brand-cardDark text-brand-purple border border-brand-purple/40'
-                }`}
-              >
-                <Clock className="w-7 h-7" />
-                <span>{timerRemainingSec}s</span>
+              {/* Room Progress Pill */}
+              <div className="flex items-center gap-4">
+                <div className="px-5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-sm sm:text-base">
+                  🏁 {progress.completed} of {participantCount} Finished
+                </div>
               </div>
             </div>
 
-            {/* Big Question Card */}
-            <div className="p-8 sm:p-12 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl">
-              <h2 className="text-2xl sm:text-4xl font-extrabold leading-snug tracking-tight text-center sm:text-left text-brand-navy dark:text-white">
-                {activeQuestion.question_text}
-              </h2>
-            </div>
+            {/* Main Stage: Leaderboard + Join QR Code */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              {/* Leaderboard Table (2 Columns) */}
+              <div className="lg:col-span-2 p-6 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-200 dark:border-brand-cardBorderDark">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  <h3 className="text-lg font-black tracking-tight text-brand-navy dark:text-white uppercase">
+                    Current Leaderboard
+                  </h3>
+                </div>
 
-            {/* Answer Options Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-              {activeQuestion.options.map((option: string, idx: number) => {
-                const letters = ['A', 'B', 'C', 'D'];
-                return (
-                  <div
-                    key={idx}
-                    className="p-6 rounded-2xl bg-white/90 dark:bg-brand-cardDark/90 border border-slate-300 dark:border-brand-cardBorderDark flex items-center gap-5 shadow-md"
-                  >
-                    <span className="w-12 h-12 rounded-xl bg-brand-purple text-white font-black text-xl flex items-center justify-center shrink-0 shadow-md">
-                      {letters[idx]}
-                    </span>
-                    <span className="text-lg sm:text-xl font-bold leading-snug">{option}</span>
+                {leaderboard.length === 0 ? (
+                  <div className="py-16 text-center text-slate-400 text-sm">
+                    Scores will appear here as participants submit answers...
                   </div>
-                );
-              })}
+                ) : (
+                  <div className="space-y-2">
+                    {leaderboard.slice(0, 8).map((p: any, idx: number) => {
+                      const rank = p.rank || idx + 1;
+                      return (
+                        <div
+                          key={p.id}
+                          className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-[#080E2B]/60 border border-slate-200 dark:border-brand-cardBorderDark/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`w-7 h-7 rounded-xl flex items-center justify-center font-black text-xs ${
+                                rank === 1
+                                  ? 'bg-amber-500 text-white shadow-md'
+                                  : rank === 2
+                                  ? 'bg-slate-400 text-white'
+                                  : rank === 3
+                                  ? 'bg-amber-700 text-white'
+                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              }`}
+                            >
+                              {rank}
+                            </span>
+                            <span className="font-extrabold text-sm sm:text-base text-brand-navy dark:text-white">
+                              {p.name}
+                            </span>
+                            <span className="text-xs text-slate-400 font-medium">({p.department})</span>
+                          </div>
+
+                          <div className="flex items-center gap-4">
+                            <span className="text-xs text-slate-400 font-mono">
+                              {p.total_response_time_ms ? `${(p.total_response_time_ms / 1000).toFixed(1)}s` : ''}
+                            </span>
+                            <span className="text-base font-black text-brand-purple">
+                              {p.total_score ?? p.score ?? 0} pts
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Join QR Card for Late Arrivals */}
+              <div className="p-6 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl text-center space-y-3">
+                <span className="text-[11px] uppercase tracking-wider font-extrabold text-brand-purple block">
+                  Join Active Quiz
+                </span>
+                <div className="p-3 bg-white rounded-2xl border-2 border-brand-purple inline-block shadow-md">
+                  {qrCodeDataUrl ? (
+                    <img src={qrCodeDataUrl} alt="Join QR Code" className="w-44 h-44 mx-auto" />
+                  ) : (
+                    <div className="w-44 h-44 flex items-center justify-center text-slate-400 text-xs">
+                      Loading QR...
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Game Code</span>
+                  <span className="text-2xl font-mono font-black tracking-widest text-brand-purple">{code}</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                  Late participants can scan and begin from Question 1.
+                </p>
+              </div>
             </div>
           </div>
         )}

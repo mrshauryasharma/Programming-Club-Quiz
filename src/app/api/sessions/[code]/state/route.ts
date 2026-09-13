@@ -59,9 +59,23 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       questionSummary = await db.getQuestionSummary(session.id, session.current_question_index);
     }
 
-    if (session.current_state === 'SHOW_LEADERBOARD' || session.current_state === 'FINAL_RESULTS' || session.current_state === 'COMPLETED') {
+    // Always provide leaderboard for Organizer and Projector during live and completed states
+    if (
+      includeParticipants ||
+      session.current_state === 'QUESTION_ACTIVE' ||
+      session.current_state === 'SHOW_LEADERBOARD' ||
+      session.current_state === 'FINAL_RESULTS' ||
+      session.current_state === 'COMPLETED'
+    ) {
       leaderboard = await db.getLeaderboard(session.id);
     }
+
+    const totalQuestions = quiz?.questions?.length || 0;
+    const progress = await db.getSessionProgress(session.id, totalQuestions);
+
+    const answeredQuestionIds = participantId
+      ? await db.getParticipantAnsweredQuestionIds(session.id, participantId)
+      : [];
 
     const sanitizedQuestions = (quiz?.questions || []).map((q, idx) => ({
       id: q.id,
@@ -69,7 +83,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       options: q.options,
       timer_seconds: q.timer_seconds,
       order_index: idx,
-      total_questions: quiz?.questions?.length || 0,
+      total_questions: totalQuestions,
     }));
 
     // Efficient payload: send full participant list only if explicitly requested (e.g. Organizer)
@@ -91,18 +105,21 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       status: p.status,
       warning_count: p.warning_count,
       total_score: p.total_score,
+      total_response_time_ms: p.total_response_time_ms,
     }));
 
     return NextResponse.json({
       session,
       quiz_title: quiz?.title || 'Programming Club Quiz',
-      total_questions: quiz?.questions?.length || 0,
+      total_questions: totalQuestions,
       participant_count: participants.length,
       participants: mappedParticipants,
       activeQuestion,
       questions: sanitizedQuestions,
       questionSummary,
       leaderboard,
+      progress,
+      answered_question_ids: answeredQuestionIds,
     }, {
       headers: {
         'Cache-Control': 'no-store, max-age=0',

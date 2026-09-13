@@ -9,6 +9,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
     const { action } = await req.json();
 
     const validActions = [
+      'START_QUIZ',
       'START_QUESTION',
       'END_QUESTION',
       'SHOW_LEADERBOARD',
@@ -24,10 +25,15 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
     const session = await db.transitionSessionState(code, action as any);
 
     let eventName: RealtimeEvent = 'STATE_CHANGE';
-    if (action === 'START_QUESTION' || action === 'NEXT_QUESTION') eventName = 'QUESTION_STARTED';
-    else if (action === 'END_QUESTION') eventName = 'QUESTION_ENDED';
-    else if (action === 'SHOW_LEADERBOARD') eventName = 'SHOW_LEADERBOARD';
-    else if (action === 'FINAL_RESULTS' || action === 'END_QUIZ') eventName = 'FINAL_RESULTS';
+    if (action === 'START_QUIZ' || action === 'START_QUESTION' || action === 'NEXT_QUESTION') {
+      eventName = 'QUESTION_STARTED';
+    } else if (action === 'END_QUESTION') {
+      eventName = 'QUESTION_ENDED';
+    } else if (action === 'SHOW_LEADERBOARD') {
+      eventName = 'SHOW_LEADERBOARD';
+    } else if (action === 'FINAL_RESULTS' || action === 'END_QUIZ') {
+      eventName = 'FINAL_RESULTS';
+    }
 
     await broadcastSessionEvent(session.game_code, eventName, {
       action,
@@ -37,16 +43,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ code: 
       question_start_time: session.question_start_time,
     });
 
-    // Server-authoritative timer orchestration
-    if (session.current_state === 'QUESTION_ACTIVE') {
-      const quiz = await db.getQuizById(session.quiz_id);
-      const q = quiz?.questions?.[session.current_question_index];
-      if (q) {
-        startQuestionTimer(session.id, session.game_code, session.current_question_index, q.timer_seconds * 1000);
-      }
-    } else if (session.current_state === 'QUESTION_ENDED') {
-      scheduleNextAdvance(session.id, session.game_code, session.current_question_index);
-    } else {
+    // Also broadcast STATE_CHANGE if eventName was specific so generic listeners trigger
+    if (eventName !== 'STATE_CHANGE') {
+      await broadcastSessionEvent(session.game_code, 'STATE_CHANGE', {
+        action,
+        status: session.status,
+        current_state: session.current_state,
+        current_question_index: session.current_question_index,
+      });
+    }
+
+    if (action === 'END_QUIZ' || action === 'FINAL_RESULTS') {
       cancelSessionTimer(session.id);
     }
 

@@ -229,19 +229,28 @@ export default function ParticipantPlayPage() {
       if (data.questions && data.questions.length > 0) {
         setQuestionsList((prev) => {
           if (prev.length === 0) {
+            const serverAnswered: string[] = data.answered_question_ids || [];
             let restoreIndex = 0;
             for (let i = 0; i < data.questions.length; i++) {
               const q = data.questions[i];
-              if (sessionStorage.getItem(`pc_ans_${code}_${q.id}`)) {
+              const isAnsweredOnServer = serverAnswered.includes(q.id);
+              const isAnsweredInStorage =
+                typeof window !== 'undefined' &&
+                participantId &&
+                !!sessionStorage.getItem(`pc_ans_${code}_${participantId}_${q.id}`);
+
+              if (isAnsweredOnServer || isAnsweredInStorage) {
                 restoreIndex = i + 1;
               } else {
                 break;
               }
             }
+
             if (restoreIndex >= data.questions.length) {
               setShowCompletionScreen(true);
             } else {
               setMyQuestionIndex(restoreIndex);
+              questionStartTimeRef.current = Date.now();
               setTimerRemainingSec(data.questions[restoreIndex]?.timer_seconds || 30);
             }
           }
@@ -332,6 +341,7 @@ export default function ParticipantPlayPage() {
               setMyQuestionIndex(nextIndex);
               setSelectedOption(null);
               setSubmitted(false);
+              questionStartTimeRef.current = Date.now();
               return questionsList[nextIndex]?.timer_seconds || 30;
             } else if (questionsList.length > 0) {
               setShowCompletionScreen(true);
@@ -360,8 +370,10 @@ export default function ParticipantPlayPage() {
     // Measure exact time spent specifically on this question
     const timeSpentMs = Math.max(150, Date.now() - questionStartTimeRef.current);
 
-    // Persist to sessionStorage so refresh/reconnect knows this question was answered
-    sessionStorage.setItem(`pc_ans_${code}_${currentQ.id}`, `${index}`);
+    // Persist to sessionStorage scoped by participantId so refresh/reconnect knows this question was answered
+    if (typeof window !== 'undefined' && participantId) {
+      sessionStorage.setItem(`pc_ans_${code}_${participantId}_${currentQ.id}`, `${index}`);
+    }
 
     const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
 
