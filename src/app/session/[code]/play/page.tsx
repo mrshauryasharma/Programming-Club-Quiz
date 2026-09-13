@@ -35,6 +35,8 @@ export default function ParticipantPlayPage() {
   // Submission & Local state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [pendingOption, setPendingOption] = useState<number | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [questionsList, setQuestionsList] = useState<any[]>([]);
   const [myQuestionIndex, setMyQuestionIndex] = useState<number>(0);
   const [showCompletionScreen, setShowCompletionScreen] = useState(false);
@@ -341,6 +343,8 @@ export default function ParticipantPlayPage() {
               setMyQuestionIndex(nextIndex);
               setSelectedOption(null);
               setSubmitted(false);
+              setPendingOption(null);
+              setShowConfirmModal(false);
               questionStartTimeRef.current = Date.now();
               return questionsList[nextIndex]?.timer_seconds || 30;
             } else if (questionsList.length > 0) {
@@ -360,10 +364,28 @@ export default function ParticipantPlayPage() {
     };
   }, [sessionState?.current_state, myQuestionIndex, questionsList, showCompletionScreen]);
 
-  // Submit Answer handler — immediately advances participant to next question with exact response timing
-  const handleOptionSelect = async (index: number) => {
+  // Submit Answer handler — split into two steps: select → confirm → submit
+  const handleOptionSelect = (index: number) => {
     if (submitted || isRemoved || sessionState?.current_state !== 'QUESTION_ACTIVE') return;
+    // Highlight the selected option and show confirmation modal
+    setPendingOption(index);
+    setSelectedOption(index);
+    setShowConfirmModal(true);
+  };
 
+  // Cancel confirmation — deselect option
+  const handleCancelConfirm = () => {
+    setPendingOption(null);
+    setSelectedOption(null);
+    setShowConfirmModal(false);
+  };
+
+  // Confirm and submit the answer — then advance to next question
+  const handleConfirmSubmit = async () => {
+    if (pendingOption === null || submitted || isRemoved) return;
+    setShowConfirmModal(false);
+
+    const index = pendingOption;
     const currentQ = questionsList[myQuestionIndex] || activeQuestion;
     if (!currentQ?.id) return;
 
@@ -391,6 +413,7 @@ export default function ParticipantPlayPage() {
       const nextQ = questionsList[nextIndex];
       setTimerRemainingSec(nextQ?.timer_seconds || 30);
     }
+    setPendingOption(null);
 
     // Persist answer and accurate timing on server in background
     try {
@@ -664,6 +687,57 @@ export default function ParticipantPlayPage() {
           })()
         )}
       </div>
+
+      {/* Confirmation Modal — "Are you sure? You cannot go back!" */}
+      {showConfirmModal && pendingOption !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white dark:bg-brand-cardDark rounded-2xl shadow-2xl border border-slate-200 dark:border-brand-cardBorderDark overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800 px-5 py-3 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+              <h3 className="font-bold text-amber-800 dark:text-amber-300 text-base">Confirm Your Answer</h3>
+            </div>
+
+            {/* Body */}
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                You selected:
+              </p>
+              <div className="p-3 rounded-xl bg-brand-purple/10 dark:bg-brand-purple/20 border border-brand-purple/30 flex items-center gap-3">
+                <span className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs bg-brand-purple text-white shrink-0">
+                  {['A', 'B', 'C', 'D'][pendingOption]}
+                </span>
+                <span className="text-sm font-semibold text-brand-navy dark:text-white">
+                  {(() => {
+                    const currentQ = questionsList[myQuestionIndex] || activeQuestion;
+                    return currentQ?.options?.[pendingOption] || `Option ${pendingOption + 1}`;
+                  })()}
+                </span>
+              </div>
+              <p className="text-xs text-red-600 dark:text-red-400 font-semibold flex items-center gap-1.5 mt-1">
+                <Ban className="w-3.5 h-3.5 shrink-0" />
+                ⚠️ Once confirmed, you CANNOT change your answer!
+              </p>
+            </div>
+
+            {/* Actions */}
+            <div className="px-5 pb-5 flex gap-3">
+              <button
+                onClick={handleCancelConfirm}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+              >
+                Change
+              </button>
+              <button
+                onClick={handleConfirmSubmit}
+                className="flex-1 px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-brand-purple hover:bg-brand-purple/90 shadow-md transition-colors"
+              >
+                ✅ Confirm & Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="w-full max-w-2xl mx-auto text-center py-2 text-[11px] text-slate-500 dark:text-slate-400">
