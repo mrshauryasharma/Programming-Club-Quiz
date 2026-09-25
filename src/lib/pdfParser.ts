@@ -111,11 +111,15 @@ export function parseMCQsFromText(rawText: string): ExtractedMCQ[] {
             letChar = String.fromCharCode(64 + parseInt(letChar, 10));
           }
           lineOpts.push({ letter: letChar, text: m[2].trim() });
+        } else if (lineOpts.length > 0 && line.length > 0 && !line.match(/^(?:Ans(?:wer)?|Key|Solution)/i)) {
+          // Continuation line of multi-line pattern/text
+          const prev = lineOpts[lineOpts.length - 1];
+          prev.text = prev.text ? prev.text + '\n' + line : line;
         }
       }
 
       if (lineOpts.length >= 2 && firstOptLineIdx > 0) {
-        const questionText = lines.slice(0, firstOptLineIdx).join(' ').trim();
+        const questionText = lines.slice(0, firstOptLineIdx).join('\n').trim();
         const options = lineOpts.map(o => o.text);
 
         let correctIdx = 0;
@@ -144,7 +148,7 @@ export function parseMCQsFromText(rawText: string): ExtractedMCQ[] {
     }
 
     // Extract question text before first option
-    const questionText = block.slice(0, optionMatches[0].index).replace(/\n+/g, ' ').trim();
+    const questionText = block.slice(0, optionMatches[0].index).replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
     if (!questionText) continue;
 
     // Extract options from between delimiters
@@ -162,7 +166,7 @@ export function parseMCQsFromText(rawText: string): ExtractedMCQ[] {
         }
       }
 
-      optText = optText.replace(/\n+/g, ' ').trim();
+      optText = optText.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
       rawOptions.push(optText);
     }
 

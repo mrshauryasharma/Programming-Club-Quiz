@@ -169,7 +169,7 @@ export default function QuizHistoryAnalyticsPage() {
               <AlertCircle className="w-4 h-4 text-amber-600" />
               <span>Most Missed Question:</span>
             </div>
-            <p className="text-sm font-semibold">{mostDifficultQuestion.question_text}</p>
+            <p className="text-sm font-semibold whitespace-pre-wrap leading-relaxed">{mostDifficultQuestion.question_text}</p>
             <div className="mt-2 flex items-center gap-4 text-slate-600 font-medium">
               <span>
                 Accuracy:{' '}
@@ -202,7 +202,7 @@ export default function QuizHistoryAnalyticsPage() {
                   className="p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs"
                 >
                   <div className="flex items-start justify-between gap-4 mb-2">
-                    <span className="font-bold text-sm text-slate-900">
+                    <span className="font-bold text-sm text-slate-900 whitespace-pre-wrap leading-relaxed flex-1">
                       Q{idx + 1}: {qs.question_text}
                     </span>
                     <span

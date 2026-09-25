@@ -339,7 +339,7 @@ export default function ProjectorViewPage() {
               <span className="px-5 py-2 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-sm uppercase tracking-wider border border-emerald-200">
                 Time Expired • Question Results
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mt-3 text-brand-navy">
+              <h2 className="text-2xl sm:text-3xl font-extrabold mt-3 text-brand-navy whitespace-pre-wrap leading-snug">
                 {activeQuestion?.question_text}
               </h2>
             </div>
@@ -362,10 +362,10 @@ export default function ProjectorViewPage() {
                         : 'bg-white border-slate-200 opacity-80'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex items-start gap-3.5 flex-1 min-w-0">
                         <span
-                          className={`w-10 h-10 rounded-xl font-black text-lg flex items-center justify-center shrink-0 ${
+                          className={`w-10 h-10 rounded-xl font-black text-lg flex items-center justify-center shrink-0 mt-0.5 ${
                             isCorrect
                               ? 'bg-emerald-500 text-white'
                               : 'bg-slate-100 text-slate-700'
@@ -373,9 +373,11 @@ export default function ProjectorViewPage() {
                         >
                           {letters[idx]}
                         </span>
-                        <span className="text-base sm:text-lg font-bold text-slate-800">{option}</span>
+                        <span className="text-base sm:text-lg font-mono font-bold text-slate-800 whitespace-pre-wrap break-words leading-relaxed flex-1">
+                          {option}
+                        </span>
                       </div>
-                      {isCorrect && <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />}
+                      {isCorrect && <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0 mt-1" />}
                     </div>
 
                     {/* Distribution Bar */}

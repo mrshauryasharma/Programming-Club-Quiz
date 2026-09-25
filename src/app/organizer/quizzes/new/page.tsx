@@ -343,21 +343,26 @@ export default function CreateQuizPage() {
                 </div>
 
                 <div>
-                  <input
-                    type="text"
+                  <textarea
                     value={q.question_text}
                     onChange={(e) => updateQuestionText(qIndex, e.target.value)}
-                    placeholder="Enter question text..."
+                    rows={3}
+                    placeholder="Enter question text (supports code, logic & multi-line text)..."
                     required
-                    className="w-full px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple outline-none"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-semibold font-mono bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple outline-none whitespace-pre-wrap leading-relaxed resize-y min-h-[72px]"
                   />
                 </div>
 
                 {/* 4 Options with Radio Selector */}
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold uppercase text-slate-500">
-                    Options & Correct Answer (Select circle for correct option)
-                  </span>
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <span className="text-[11px] font-bold uppercase text-slate-500">
+                      Options & Correct Answer (Click letter badge to mark correct)
+                    </span>
+                    <span className="text-[10px] font-semibold text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-md">
+                      Supports Multi-Line Code & Patterns (Enter for new line)
+                    </span>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {q.options.map((opt, optIndex) => {
                       const isCorrect = q.correct_option_index === optIndex;
@@ -365,30 +370,31 @@ export default function CreateQuizPage() {
                       return (
                         <div
                           key={optIndex}
-                          className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
+                          className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all ${
                             isCorrect
-                              ? 'border-emerald-500 bg-emerald-50'
-                              : 'border-slate-300 bg-slate-50'
+                              ? 'border-emerald-500 bg-emerald-50/80 ring-1 ring-emerald-400'
+                              : 'border-slate-300 bg-slate-50 focus-within:border-brand-purple focus-within:bg-white'
                           }`}
                         >
                           <button
                             type="button"
                             onClick={() => updateCorrectOption(qIndex, optIndex)}
-                            className={`w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-all cursor-pointer ${
+                            title={`Mark Option ${letters[optIndex]} as correct`}
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-all cursor-pointer mt-0.5 ${
                               isCorrect
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-slate-200 text-slate-600'
+                                ? 'bg-emerald-500 text-white shadow-sm ring-2 ring-emerald-300'
+                                : 'bg-slate-200 text-slate-600 hover:bg-slate-300'
                             }`}
                           >
                             {letters[optIndex]}
                           </button>
-                          <input
-                            type="text"
+                          <textarea
                             value={opt}
                             onChange={(e) => updateOptionText(qIndex, optIndex, e.target.value)}
-                            placeholder={`Option ${letters[optIndex]}...`}
+                            placeholder={`Option ${letters[optIndex]} (supports newlines & patterns)...`}
                             required
-                            className="w-full bg-transparent text-xs font-medium outline-none text-slate-800"
+                            rows={3}
+                            className="w-full bg-transparent text-xs sm:text-sm font-mono font-medium outline-none text-slate-800 resize-y min-h-[68px] whitespace-pre-wrap leading-snug"
                           />
                         </div>
                       );

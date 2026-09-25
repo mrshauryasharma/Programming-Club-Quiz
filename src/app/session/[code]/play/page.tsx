@@ -885,7 +885,7 @@ export default function ParticipantPlayPage() {
 
                 {/* Question Card */}
                 <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-lg">
-                  <h2 className="text-lg sm:text-xl font-bold leading-snug tracking-tight text-brand-navy">
+                  <h2 className="text-lg sm:text-xl font-bold leading-relaxed tracking-tight text-brand-navy whitespace-pre-wrap">
                     {currentQ.question_text}
                   </h2>
                 </div>
@@ -902,7 +902,7 @@ export default function ParticipantPlayPage() {
                         type="button"
                         onClick={() => handleOptionSelect(idx)}
                         disabled={isSubmitting || submitted}
-                        className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.99] ${
+                        className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.99] min-h-[64px] ${
                           isSelected
                             ? 'bg-brand-purple/10 text-brand-navy border-brand-purple ring-2 ring-brand-purple/50 shadow-md font-semibold'
                             : isSubmitting || submitted
@@ -911,7 +911,7 @@ export default function ParticipantPlayPage() {
                         }`}
                       >
                         <span
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors mt-0.5 ${
                             isSelected
                               ? 'bg-brand-purple text-white shadow-sm'
                               : 'bg-slate-100 text-slate-700'
@@ -919,7 +919,7 @@ export default function ParticipantPlayPage() {
                         >
                           {isSelected ? '✓' : optionLetters[idx]}
                         </span>
-                        <span className="text-sm font-medium leading-relaxed mt-0.5 flex-1">{option}</span>
+                        <span className="text-xs sm:text-sm font-mono font-medium leading-relaxed mt-0.5 flex-1 whitespace-pre-wrap break-words">{option}</span>
                       </button>
                     );
                   })}

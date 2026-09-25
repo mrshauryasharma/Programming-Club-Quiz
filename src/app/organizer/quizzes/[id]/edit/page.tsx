@@ -439,60 +439,67 @@ export default function EditQuizPage({ params }: { params: Promise<{ id: string 
                   <textarea
                     value={q.question_text}
                     onChange={(e) => updateQuestionText(qIndex, e.target.value)}
-                    placeholder="Enter the question text here..."
-                    rows={2}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold focus:bg-white focus:outline-none focus:border-brand-purple"
+                    placeholder="Enter the question text here (supports code, logic & multi-line text)..."
+                    rows={3}
+                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm font-semibold font-mono whitespace-pre-wrap leading-relaxed focus:bg-white focus:outline-none focus:border-brand-purple resize-y min-h-[72px]"
                     required
                   />
                 </div>
 
                 {/* 4 Options */}
                 <div className="space-y-2.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Answer Options (Click radio button to mark correct answer)
-                  </label>
+                  <div className="flex flex-wrap items-center justify-between gap-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Answer Options (Click letter badge to mark correct answer)
+                    </label>
+                    <span className="text-[10px] font-semibold text-brand-purple bg-brand-purple/10 px-2 py-0.5 rounded-md">
+                      Supports Multi-Line Code & Patterns (Enter for new line)
+                    </span>
+                  </div>
 
-                  <div className="grid grid-cols-1 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {q.options.map((opt, optIndex) => {
                       const isCorrect = q.correct_option_index === optIndex;
                       const letter = String.fromCharCode(65 + optIndex);
                       return (
                         <div
                           key={optIndex}
-                          onClick={() => updateCorrectOption(qIndex, optIndex)}
-                          className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all cursor-pointer ${
+                          className={`flex items-start gap-2.5 p-3 rounded-xl border transition-all ${
                             isCorrect
-                              ? 'bg-purple-50 border-brand-purple'
-                              : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+                              ? 'bg-purple-50/70 border-brand-purple ring-1 ring-brand-purple/40 shadow-sm'
+                              : 'bg-slate-50 border-slate-200 hover:border-slate-300 focus-within:bg-white focus-within:border-brand-purple'
                           }`}
                         >
                           <button
                             type="button"
-                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black shrink-0 transition-colors ${
+                            onClick={() => updateCorrectOption(qIndex, optIndex)}
+                            title={`Mark Option ${letter} as correct`}
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-mono font-bold shrink-0 transition-colors cursor-pointer mt-0.5 ${
                               isCorrect
-                                ? 'bg-brand-purple text-white'
-                                : 'border-2 border-slate-300 text-slate-500'
+                                ? 'bg-brand-purple text-white shadow-sm ring-2 ring-purple-300'
+                                : 'border border-slate-300 bg-white text-slate-600 hover:bg-slate-100'
                             }`}
                           >
                             {letter}
                           </button>
 
-                          <input
-                            type="text"
-                            value={opt}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => updateOptionText(qIndex, optIndex, e.target.value)}
-                            placeholder={`Option ${letter} text...`}
-                            className="w-full bg-transparent text-xs sm:text-sm font-medium focus:outline-none text-slate-800"
-                            required
-                          />
-
-                          {isCorrect && (
-                            <span className="text-[10px] font-black uppercase tracking-wider text-brand-purple shrink-0 flex items-center gap-1">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Correct</span>
-                            </span>
-                          )}
+                          <div className="flex-1 min-w-0">
+                            <textarea
+                              value={opt}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateOptionText(qIndex, optIndex, e.target.value)}
+                              placeholder={`Option ${letter} (supports newlines & patterns)...`}
+                              rows={3}
+                              className="w-full bg-transparent text-xs sm:text-sm font-mono font-medium focus:outline-none text-slate-800 resize-y min-h-[68px] whitespace-pre-wrap leading-snug"
+                              required
+                            />
+                            {isCorrect && (
+                              <div className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-brand-purple mt-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Correct Answer</span>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
