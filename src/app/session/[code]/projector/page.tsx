@@ -135,9 +135,9 @@ export default function ProjectorViewPage() {
   const currentState = sessionState?.current_state || 'WAITING';
 
   return (
-    <div className="min-h-screen flex flex-col justify-between p-6 sm:p-10 bg-[#F7F4FE] dark:bg-[#020205] text-[#031246] dark:text-[#F7F4FE] transition-colors">
+    <div className="min-h-screen flex flex-col justify-between p-6 sm:p-10 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246] transition-colors">
       {/* Top Projector Header */}
-      <header className="flex items-center justify-between pb-6 border-b border-slate-300 dark:border-brand-cardBorderDark">
+      <header className="flex items-center justify-between pb-6 border-b border-slate-200">
         <div className="flex items-center gap-4">
           <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-brand-purple shadow-md">
             <Image src="/logo.png" alt="Programming Club Logo" fill className="object-contain" priority />
@@ -146,7 +146,7 @@ export default function ProjectorViewPage() {
             <h1 className="text-xl sm:text-2xl font-black tracking-tight text-brand-purple uppercase">
               USICT GBU PROGRAMMING CLUB
             </h1>
-            <p className="text-xs sm:text-sm font-semibold tracking-widest text-slate-500 dark:text-slate-400">
+            <p className="text-xs sm:text-sm font-semibold tracking-widest text-slate-500">
               LEARN • CONNECT • EXPLORE • GROW
             </p>
           </div>
@@ -154,14 +154,14 @@ export default function ProjectorViewPage() {
 
         <div className="flex items-center gap-4">
           {/* Active Participants Badge */}
-          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-brand-purple/10 dark:bg-brand-purple/20 border border-brand-purple/30 text-brand-purple font-bold text-sm">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-brand-purple/10 border border-brand-purple/30 text-brand-purple font-bold text-sm">
             <Users className="w-5 h-5" />
             <span>{participantCount} Joined</span>
           </div>
 
           <button
             onClick={toggleFullscreen}
-            className="p-2.5 rounded-xl bg-white dark:bg-brand-cardDark border border-slate-300 dark:border-brand-cardBorderDark text-slate-700 dark:text-slate-300 hover:text-brand-purple transition-all"
+            className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-brand-purple hover:bg-slate-200 transition-all cursor-pointer"
             title="Fullscreen"
           >
             {isFullscreen ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
@@ -177,19 +177,19 @@ export default function ProjectorViewPage() {
         {/* 1. LOBBY / WAITING STAGE (Large QR Code + Game Code) */}
         {/* -------------------------------------------------------- */}
         {currentState === 'WAITING' && (
-          <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10 p-8 sm:p-12 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl backdrop-blur-md">
+          <div className="max-w-4xl mx-auto flex flex-col md:flex-row items-center justify-between gap-10 p-8 sm:p-12 rounded-3xl bg-white border border-slate-200 shadow-2xl">
             <div className="text-center md:text-left space-y-4">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-purple/10 text-brand-purple dark:bg-brand-purple/20 font-bold text-xs uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-brand-purple/10 text-brand-purple font-bold text-xs uppercase tracking-wider">
                 <Sparkles className="w-4 h-4" /> Join Live Quiz
               </div>
-              <h2 className="text-4xl sm:text-5xl font-black tracking-tight leading-tight">
+              <h2 className="text-4xl sm:text-5xl font-black tracking-tight leading-tight text-brand-navy">
                 Scan QR or Enter Game Code
               </h2>
-              <p className="text-slate-600 dark:text-brand-slate text-base">
+              <p className="text-slate-600 text-base">
                 Use your phone camera or visit the quiz portal to enter.
               </p>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#080E2B] border border-slate-200 dark:border-brand-cardBorderDark inline-block">
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 inline-block shadow-sm">
                 <span className="text-xs uppercase tracking-wider text-slate-500 font-bold block mb-1">
                   Game Code
                 </span>
@@ -216,17 +216,17 @@ export default function ProjectorViewPage() {
         {currentState === 'QUESTION_ACTIVE' && (
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Top Live Banner */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-3xl bg-white border border-slate-200 shadow-xl">
               <div className="flex items-center gap-3">
                 <span className="relative flex h-4 w-4">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500"></span>
                 </span>
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-black text-brand-navy dark:text-white uppercase tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-black text-brand-navy uppercase tracking-tight">
                     LIVE QUIZ IN PROGRESS
                   </h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Students are answering questions live • Standings update in real time
                   </p>
                 </div>
@@ -234,7 +234,7 @@ export default function ProjectorViewPage() {
 
               {/* Room Progress Pill */}
               <div className="flex items-center gap-4">
-                <div className="px-5 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-extrabold text-sm sm:text-base">
+                <div className="px-5 py-2 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-extrabold text-sm sm:text-base">
                   🏁 {progress.completed} of {participantCount} Finished
                 </div>
               </div>
@@ -243,10 +243,10 @@ export default function ProjectorViewPage() {
             {/* Main Stage: Leaderboard + Join QR Code */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {/* Leaderboard Table (2 Columns) */}
-              <div className="lg:col-span-2 p-6 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl">
-                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-200 dark:border-brand-cardBorderDark">
+              <div className="lg:col-span-2 p-6 rounded-3xl bg-white border border-slate-200 shadow-xl">
+                <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-200">
                   <Trophy className="w-5 h-5 text-amber-500" />
-                  <h3 className="text-lg font-black tracking-tight text-brand-navy dark:text-white uppercase">
+                  <h3 className="text-lg font-black tracking-tight text-brand-navy uppercase">
                     Current Leaderboard
                   </h3>
                 </div>
@@ -262,7 +262,7 @@ export default function ProjectorViewPage() {
                       return (
                         <div
                           key={p.id}
-                          className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 dark:bg-[#080E2B]/60 border border-slate-200 dark:border-brand-cardBorderDark/50"
+                          className="flex items-center justify-between p-3.5 rounded-2xl bg-slate-50 border border-slate-200"
                         >
                           <div className="flex items-center gap-3">
                             <span
@@ -273,19 +273,19 @@ export default function ProjectorViewPage() {
                                   ? 'bg-slate-400 text-white'
                                   : rank === 3
                                   ? 'bg-amber-700 text-white'
-                                  : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                  : 'bg-slate-200 text-slate-700'
                               }`}
                             >
                               {rank}
                             </span>
-                            <span className="font-extrabold text-sm sm:text-base text-brand-navy dark:text-white">
+                            <span className="font-extrabold text-sm sm:text-base text-brand-navy">
                               {p.name}
                             </span>
-                            <span className="text-xs text-slate-400 font-medium">({p.department})</span>
+                            <span className="text-xs text-slate-500 font-medium">({p.department})</span>
                           </div>
 
                           <div className="flex items-center gap-4">
-                            <span className="text-xs text-slate-400 font-mono">
+                            <span className="text-xs text-slate-500 font-mono">
                               {p.total_response_time_ms ? `${(p.total_response_time_ms / 1000).toFixed(1)}s` : ''}
                             </span>
                             <span className="text-base font-black text-brand-purple">
@@ -300,7 +300,7 @@ export default function ProjectorViewPage() {
               </div>
 
               {/* Join QR Card for Late Arrivals */}
-              <div className="p-6 rounded-3xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-xl text-center space-y-3">
+              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xl text-center space-y-3">
                 <span className="text-[11px] uppercase tracking-wider font-extrabold text-brand-purple block">
                   Join Active Quiz
                 </span>
@@ -317,7 +317,7 @@ export default function ProjectorViewPage() {
                   <span className="text-[10px] text-slate-400 block uppercase font-bold">Game Code</span>
                   <span className="text-2xl font-mono font-black tracking-widest text-brand-purple">{code}</span>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-tight">
+                <p className="text-[11px] text-slate-500 leading-tight">
                   Late participants can scan and begin from Question 1.
                 </p>
               </div>
@@ -331,10 +331,10 @@ export default function ProjectorViewPage() {
         {currentState === 'QUESTION_ENDED' && (
           <div className="max-w-5xl mx-auto space-y-6">
             <div className="text-center">
-              <span className="px-5 py-2 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-extrabold text-sm uppercase tracking-wider border border-emerald-500/30">
+              <span className="px-5 py-2 rounded-full bg-emerald-50 text-emerald-700 font-extrabold text-sm uppercase tracking-wider border border-emerald-200">
                 Time Expired • Question Results
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold mt-3">
+              <h2 className="text-2xl sm:text-3xl font-extrabold mt-3 text-brand-navy">
                 {activeQuestion?.question_text}
               </h2>
             </div>
@@ -353,8 +353,8 @@ export default function ProjectorViewPage() {
                     key={idx}
                     className={`p-6 rounded-2xl border transition-all ${
                       isCorrect
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 shadow-lg'
-                        : 'bg-white/80 dark:bg-brand-cardDark/80 border-slate-200 dark:border-brand-cardBorderDark opacity-75'
+                        ? 'bg-emerald-50 border-emerald-500 shadow-lg'
+                        : 'bg-white border-slate-200 opacity-80'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -363,26 +363,26 @@ export default function ProjectorViewPage() {
                           className={`w-10 h-10 rounded-xl font-black text-lg flex items-center justify-center shrink-0 ${
                             isCorrect
                               ? 'bg-emerald-500 text-white'
-                              : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                              : 'bg-slate-100 text-slate-700'
                           }`}
                         >
                           {letters[idx]}
                         </span>
-                        <span className="text-base sm:text-lg font-bold">{option}</span>
+                        <span className="text-base sm:text-lg font-bold text-slate-800">{option}</span>
                       </div>
                       {isCorrect && <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" />}
                     </div>
 
                     {/* Distribution Bar */}
-                    <div className="w-full bg-slate-200 dark:bg-slate-800 h-3 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
-                          isCorrect ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-600'
+                          isCorrect ? 'bg-emerald-500' : 'bg-slate-400'
                         }`}
                         style={{ width: `${pct}%` }}
                       />
                     </div>
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mt-1.5">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-500 mt-1.5">
                       <span>{count} answers</span>
                       <span>{pct}%</span>
                     </div>
@@ -393,7 +393,7 @@ export default function ProjectorViewPage() {
 
             {/* Fastest Answer highlight */}
             {questionSummary?.fastest_participant_name && (
-              <div className="p-4 rounded-2xl bg-amber-400/10 border border-amber-400/30 text-amber-700 dark:text-amber-300 text-center font-bold text-sm flex items-center justify-center gap-2">
+              <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-800 text-center font-bold text-sm flex items-center justify-center gap-2 shadow-sm">
                 <Sparkles className="w-4 h-4 text-amber-500" />
                 <span>
                   Fastest Correct Answer:{' '}
@@ -411,14 +411,14 @@ export default function ProjectorViewPage() {
         {(currentState === 'SHOW_LEADERBOARD' || currentState === 'FINAL_RESULTS' || currentState === 'COMPLETED') && (
           <div className="max-w-4xl mx-auto space-y-6">
             <div className="text-center">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 font-extrabold text-sm uppercase">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-50 text-amber-700 border border-amber-300 font-extrabold text-sm uppercase">
                 <Trophy className="w-5 h-5 text-amber-500" />
                 <span>
                   {currentState === 'SHOW_LEADERBOARD' ? 'Current Standings' : 'Final Official Results'}
                 </span>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-black mt-2">Leaderboard</h2>
-              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+              <h2 className="text-3xl sm:text-4xl font-black mt-2 text-brand-navy">Leaderboard</h2>
+              <p className="text-xs sm:text-sm text-slate-500">
                 Score (+2/0) • Ties broken by fastest total valid response time
               </p>
             </div>
@@ -427,11 +427,11 @@ export default function ProjectorViewPage() {
             <div className="grid grid-cols-3 gap-3 sm:gap-4 items-end pt-6">
               {/* #2 Rank */}
               {leaderboard[1] && (
-                <div className="p-4 sm:p-6 rounded-2xl bg-slate-200/80 dark:bg-slate-900 border border-slate-300 dark:border-slate-800 text-center order-1 h-44 sm:h-52 flex flex-col justify-end">
-                  <span className="w-8 h-8 mx-auto rounded-full bg-slate-400 text-slate-900 font-bold flex items-center justify-center mb-2">
+                <div className="p-4 sm:p-6 rounded-2xl bg-slate-100 border border-slate-200 text-center order-1 h-44 sm:h-52 flex flex-col justify-end shadow-md">
+                  <span className="w-8 h-8 mx-auto rounded-full bg-slate-400 text-white font-bold flex items-center justify-center mb-2">
                     2
                   </span>
-                  <p className="font-bold text-sm sm:text-base truncate">{leaderboard[1].name}</p>
+                  <p className="font-bold text-sm sm:text-base text-slate-800 truncate">{leaderboard[1].name}</p>
                   <p className="text-xl sm:text-2xl font-black text-brand-purple mt-1">
                     {leaderboard[1].total_score} pts
                   </p>
@@ -443,16 +443,16 @@ export default function ProjectorViewPage() {
 
               {/* #1 Rank (Champion) */}
               {leaderboard[0] && (
-                <div className="p-5 sm:p-8 rounded-3xl bg-amber-500/10 dark:bg-amber-500/15 border-2 border-amber-400 text-center order-2 h-56 sm:h-64 flex flex-col justify-end shadow-xl">
+                <div className="p-5 sm:p-8 rounded-3xl bg-gradient-to-b from-amber-50 to-amber-100/60 border-2 border-amber-400 text-center order-2 h-56 sm:h-64 flex flex-col justify-end shadow-xl">
                   <Award className="w-10 h-10 mx-auto text-amber-500 mb-1 animate-bounce" />
                   <span className="w-9 h-9 mx-auto rounded-full bg-amber-400 text-slate-900 font-black text-lg flex items-center justify-center mb-2">
                     1
                   </span>
-                  <p className="font-extrabold text-base sm:text-lg truncate">{leaderboard[0].name}</p>
-                  <p className="text-3xl sm:text-4xl font-black text-amber-500 mt-1">
+                  <p className="font-extrabold text-base sm:text-lg text-slate-900 truncate">{leaderboard[0].name}</p>
+                  <p className="text-3xl sm:text-4xl font-black text-amber-600 mt-1">
                     {leaderboard[0].total_score} pts
                   </p>
-                  <span className="text-xs text-slate-500 font-mono font-bold">
+                  <span className="text-xs text-slate-600 font-mono font-bold">
                     {(leaderboard[0].total_response_time_ms / 1000).toFixed(1)}s
                   </span>
                 </div>
@@ -460,11 +460,11 @@ export default function ProjectorViewPage() {
 
               {/* #3 Rank */}
               {leaderboard[2] && (
-                <div className="p-4 sm:p-6 rounded-2xl bg-amber-800/10 dark:bg-amber-950/40 border border-amber-700/40 text-center order-3 h-36 sm:h-44 flex flex-col justify-end">
+                <div className="p-4 sm:p-6 rounded-2xl bg-orange-50 border border-orange-200 text-center order-3 h-36 sm:h-44 flex flex-col justify-end shadow-md">
                   <span className="w-8 h-8 mx-auto rounded-full bg-amber-700 text-white font-bold flex items-center justify-center mb-2">
                     3
                   </span>
-                  <p className="font-bold text-sm sm:text-base truncate">{leaderboard[2].name}</p>
+                  <p className="font-bold text-sm sm:text-base text-slate-800 truncate">{leaderboard[2].name}</p>
                   <p className="text-xl sm:text-2xl font-black text-brand-purple mt-1">
                     {leaderboard[2].total_score} pts
                   </p>
@@ -481,14 +481,14 @@ export default function ProjectorViewPage() {
                 {leaderboard.slice(3, 10).map((p: any) => (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between p-3.5 rounded-xl bg-white/90 dark:bg-brand-cardDark/90 border border-slate-200 dark:border-brand-cardBorderDark text-sm font-semibold"
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-200 text-sm font-semibold shadow-sm"
                   >
                     <div className="flex items-center gap-4">
-                      <span className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-mono font-bold text-xs">
+                      <span className="w-7 h-7 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-mono font-bold text-xs border border-slate-200">
                         {p.rank}
                       </span>
-                      <span>{p.name}</span>
-                      <span className="text-xs text-slate-400 font-normal">({p.department})</span>
+                      <span className="text-slate-800">{p.name}</span>
+                      <span className="text-xs text-slate-500 font-normal">({p.department})</span>
                     </div>
 
                     <div className="flex items-center gap-4">
@@ -506,7 +506,7 @@ export default function ProjectorViewPage() {
       </div>
 
       {/* Footer Branding */}
-      <footer className="pt-6 border-t border-slate-300 dark:border-brand-cardBorderDark flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
+      <footer className="pt-6 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500 font-medium">
         <p>SOICT • Gautam Buddha University</p>
         <p className="font-mono font-bold tracking-widest text-brand-purple">GAME CODE: {code}</p>
       </footer>

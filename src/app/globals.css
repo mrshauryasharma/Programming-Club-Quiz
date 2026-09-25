@@ -13,18 +13,14 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-}
-
-/* Light Mode Base */
-html.light body {
-  background-color: #F7F4FE;
+  background-color: #F8FAFC;
   color: #031246;
 }
 
-/* Dark Mode Base */
-html.dark body {
-  background-color: #020205;
-  color: #F7F4FE;
+/* Clean Professional Light Mode Base */
+html body {
+  background-color: #F8FAFC;
+  color: #031246;
 }
 
 /* Custom subtle scrollbar */
@@ -35,11 +31,10 @@ html.dark body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-html.light ::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: #CBD5E3;
   border-radius: 4px;
 }
-html.dark ::-webkit-scrollbar-thumb {
-  background: #1E2958;
-  border-radius: 4px;
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
 }

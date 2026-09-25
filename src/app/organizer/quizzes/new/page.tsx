@@ -239,9 +239,9 @@ export default function CreateQuizPage() {
   const timerPresets = [10, 15, 20, 30, 45, 60, 90, 120];
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-[#F7F4FE] dark:bg-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
       {/* Top Header */}
-      <header className="max-w-4xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200 dark:border-brand-cardBorderDark">
+      <header className="max-w-4xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200">
         <Link
           href="/organizer/dashboard"
           className="inline-flex items-center gap-2 text-xs font-bold text-brand-purple hover:underline"
@@ -256,8 +256,8 @@ export default function CreateQuizPage() {
       <div className="max-w-4xl mx-auto py-8">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Create Technical Quiz</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-brand-navy">Create Technical Quiz</h1>
+            <p className="text-xs text-slate-500 mt-1">
               Single-choice MCQ • Exactly 2 points per correct question • Max timer 120s
             </p>
           </div>
@@ -266,7 +266,7 @@ export default function CreateQuizPage() {
             <button
               type="button"
               onClick={() => setShowPdfModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-bold text-xs flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm"
+              className="px-3.5 py-2 rounded-xl bg-blue-50 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-2 hover:bg-blue-600 hover:text-white transition-all cursor-pointer shadow-sm"
             >
               <FileUp className="w-4 h-4" />
               <span>Scan / Upload PDF</span>
@@ -274,7 +274,7 @@ export default function CreateQuizPage() {
             <button
               type="button"
               onClick={() => setShowAiModal(true)}
-              className="px-3.5 py-2 rounded-xl bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple border border-brand-purple/30 font-bold text-xs flex items-center gap-2 hover:bg-brand-purple hover:text-white transition-all cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-brand-purple/10 text-brand-purple border border-brand-purple/30 font-bold text-xs flex items-center gap-2 hover:bg-brand-purple hover:text-white transition-all cursor-pointer"
             >
               <Sparkles className="w-4 h-4" />
               <span>Generate with Meta AI</span>
@@ -283,7 +283,7 @@ export default function CreateQuizPage() {
         </div>
 
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
@@ -291,9 +291,9 @@ export default function CreateQuizPage() {
 
         <form onSubmit={handleSaveQuiz} className="space-y-6">
           {/* Quiz Details Card */}
-          <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-md space-y-4">
+          <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-md space-y-4">
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                 Quiz Title <span className="text-brand-purple">*</span>
               </label>
               <input
@@ -302,12 +302,12 @@ export default function CreateQuizPage() {
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Python & Data Structures Workshop Quiz"
                 required
-                className="w-full px-4 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple outline-none font-semibold"
+                className="w-full px-4 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple outline-none font-semibold"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-600 dark:text-slate-300 mb-1">
+              <label className="block text-xs font-bold uppercase text-slate-700 mb-1">
                 Description
               </label>
               <textarea
@@ -315,7 +315,7 @@ export default function CreateQuizPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Details about session or competition..."
                 rows={2}
-                className="w-full px-4 py-2 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple outline-none"
+                className="w-full px-4 py-2 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple outline-none"
               />
             </div>
           </div>
@@ -325,7 +325,7 @@ export default function CreateQuizPage() {
             {questions.map((q, qIndex) => (
               <div
                 key={qIndex}
-                className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-md space-y-4"
+                className="p-6 rounded-2xl bg-white border border-slate-200 shadow-md space-y-4"
               >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-black uppercase tracking-wider text-brand-purple">
@@ -335,7 +335,7 @@ export default function CreateQuizPage() {
                     <button
                       type="button"
                       onClick={() => removeQuestion(qIndex)}
-                      className="text-slate-400 hover:text-rose-500 p-1"
+                      className="text-slate-400 hover:text-rose-500 p-1 cursor-pointer"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -349,13 +349,13 @@ export default function CreateQuizPage() {
                     onChange={(e) => updateQuestionText(qIndex, e.target.value)}
                     placeholder="Enter question text..."
                     required
-                    className="w-full px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple outline-none"
+                    className="w-full px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple outline-none"
                   />
                 </div>
 
                 {/* 4 Options with Radio Selector */}
                 <div className="space-y-2">
-                  <span className="text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400">
+                  <span className="text-[11px] font-bold uppercase text-slate-500">
                     Options & Correct Answer (Select circle for correct option)
                   </span>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -367,17 +367,17 @@ export default function CreateQuizPage() {
                           key={optIndex}
                           className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${
                             isCorrect
-                              ? 'border-emerald-500 bg-emerald-500/10'
-                              : 'border-slate-300 dark:border-brand-cardBorderDark bg-slate-50 dark:bg-[#080E2B]'
+                              ? 'border-emerald-500 bg-emerald-50'
+                              : 'border-slate-300 bg-slate-50'
                           }`}
                         >
                           <button
                             type="button"
                             onClick={() => updateCorrectOption(qIndex, optIndex)}
-                            className={`w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-all ${
+                            className={`w-6 h-6 rounded-full flex items-center justify-center font-mono font-bold text-xs shrink-0 transition-all cursor-pointer ${
                               isCorrect
                                 ? 'bg-emerald-500 text-white'
-                                : 'bg-slate-200 dark:bg-slate-800 text-slate-600'
+                                : 'bg-slate-200 text-slate-600'
                             }`}
                           >
                             {letters[optIndex]}
@@ -388,7 +388,7 @@ export default function CreateQuizPage() {
                             onChange={(e) => updateOptionText(qIndex, optIndex, e.target.value)}
                             placeholder={`Option ${letters[optIndex]}...`}
                             required
-                            className="w-full bg-transparent text-xs font-medium outline-none"
+                            className="w-full bg-transparent text-xs font-medium outline-none text-slate-800"
                           />
                         </div>
                       );
@@ -397,8 +397,8 @@ export default function CreateQuizPage() {
                 </div>
 
                 {/* Timer Control */}
-                <div className="pt-2 border-t border-slate-200 dark:border-brand-cardBorderDark flex flex-wrap items-center justify-between gap-3 text-xs">
-                  <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 font-semibold">
+                <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2 text-slate-700 font-semibold">
                     <Clock className="w-4 h-4 text-brand-purple" />
                     <span>Timer:</span>
                     <span className="font-mono font-bold text-brand-purple">{q.timer_seconds}s</span>
@@ -410,10 +410,10 @@ export default function CreateQuizPage() {
                         key={sec}
                         type="button"
                         onClick={() => updateTimer(qIndex, sec)}
-                        className={`px-2 py-1 rounded-lg text-[11px] font-mono font-bold ${
+                        className={`px-2 py-1 rounded-lg text-[11px] font-mono font-bold cursor-pointer ${
                           q.timer_seconds === sec
                             ? 'bg-brand-purple text-white'
-                            : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
                         {sec}s
@@ -457,18 +457,18 @@ export default function CreateQuizPage() {
 
       {/* Meta AI Modal */}
       {showAiModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md p-6 rounded-2xl bg-white dark:bg-brand-cardDark border border-brand-purple text-left shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md p-6 rounded-2xl bg-white border border-brand-purple text-left shadow-2xl">
             <div className="flex items-center gap-2 text-brand-purple mb-3">
               <Sparkles className="w-5 h-5" />
-              <h3 className="text-base font-bold">Generate with Meta AI</h3>
+              <h3 className="text-base font-bold text-brand-navy">Generate with Meta AI</h3>
             </div>
-            <p className="text-xs text-slate-500 dark:text-brand-slate mb-4">
+            <p className="text-xs text-slate-500 mb-4">
               Enter a programming topic to automatically generate 5 technical MCQs using Meta AI.
             </p>
 
             {aiError && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs">
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs">
                 {aiError}
               </div>
             )}
@@ -478,14 +478,14 @@ export default function CreateQuizPage() {
               value={aiTopic}
               onChange={(e) => setAiTopic(e.target.value)}
               placeholder="e.g. JavaScript Async/Await & Promises"
-              className="w-full px-4 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple outline-none mb-4"
+              className="w-full px-4 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple outline-none mb-4"
             />
 
             <div className="flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={() => setShowAiModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
               >
                 Cancel
               </button>
@@ -493,7 +493,7 @@ export default function CreateQuizPage() {
                 type="button"
                 onClick={handleGenerateAiQuestions}
                 disabled={aiLoading}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-purple text-white hover:bg-[#6A1694] flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-brand-purple text-white hover:bg-[#6A1694] flex items-center gap-2 cursor-pointer shadow-md"
               >
                 {aiLoading ? (
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -508,12 +508,12 @@ export default function CreateQuizPage() {
 
       {/* PDF Scanner Modal */}
       {showPdfModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md p-6 rounded-2xl bg-white dark:bg-brand-cardDark border border-blue-500 text-left shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md p-6 rounded-2xl bg-white border border-blue-500 text-left shadow-2xl">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+              <div className="flex items-center gap-2 text-blue-600">
                 <FileUp className="w-5 h-5" />
-                <h3 className="text-base font-bold">Scan PDF Question Paper</h3>
+                <h3 className="text-base font-bold text-brand-navy">Scan PDF Question Paper</h3>
               </div>
               <button
                 type="button"
@@ -522,25 +522,25 @@ export default function CreateQuizPage() {
                   setPdfFile(null);
                   setPdfError(null);
                 }}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white cursor-pointer"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 leading-relaxed">
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
               Upload a PDF document with MCQs (e.g. 1. Question... A) ... B) ... C) ... D) ... Ans: B). The system will automatically parse and load the questions directly into your quiz.
             </p>
 
             {pdfError && (
-              <div className="mb-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2">
+              <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{pdfError}</span>
               </div>
             )}
 
             <div className="mb-5">
-              <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50/50 dark:bg-[#080E2B]/50">
+              <label className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition-colors bg-slate-50">
                 <input
                   type="file"
                   accept="application/pdf"
@@ -557,7 +557,7 @@ export default function CreateQuizPage() {
                   <div className="flex items-center gap-3">
                     <FileText className="w-8 h-8 text-blue-500" />
                     <div className="text-left">
-                      <p className="text-xs font-bold text-slate-800 dark:text-white truncate max-w-[200px]">
+                      <p className="text-xs font-bold text-slate-800 truncate max-w-[200px]">
                         {pdfFile.name}
                       </p>
                       <p className="text-[10px] text-slate-400">
@@ -567,11 +567,11 @@ export default function CreateQuizPage() {
                   </div>
                 ) : (
                   <>
-                    <Upload className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-2" />
-                    <p className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                    <Upload className="w-8 h-8 text-slate-400 mb-2" />
+                    <p className="text-xs font-bold text-slate-700">
                       Click to choose PDF question paper
                     </p>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">
+                    <p className="text-[11px] text-slate-400 mt-0.5">
                       Supports standard MCQ format (.pdf up to 10MB)
                     </p>
                   </>
@@ -587,7 +587,7 @@ export default function CreateQuizPage() {
                   setPdfFile(null);
                   setPdfError(null);
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-white"
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
               >
                 Cancel
               </button>

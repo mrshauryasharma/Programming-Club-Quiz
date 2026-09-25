@@ -486,18 +486,18 @@ export default function ParticipantPlayPage() {
   // -------------------------------------------------------------
   if (isRemoved) {
     return (
-      <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#020205] text-white">
-        <div className="w-full max-w-md p-8 rounded-2xl bg-rose-950/40 border border-rose-800 text-center shadow-2xl backdrop-blur-md">
-          <div className="w-16 h-16 mx-auto rounded-full bg-rose-900/60 flex items-center justify-center text-rose-400 mb-4 border border-rose-700">
+      <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 text-slate-900">
+        <div className="w-full max-w-md p-8 rounded-2xl bg-white border border-rose-200 text-center shadow-xl">
+          <div className="w-16 h-16 mx-auto rounded-full bg-rose-50 flex items-center justify-center text-rose-600 mb-4 border border-rose-200">
             <Ban className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-black text-rose-400 tracking-tight">REMOVED FROM SESSION</h2>
-          <p className="text-xs text-rose-300/80 mt-2 leading-relaxed">
+          <h2 className="text-2xl font-black text-rose-600 tracking-tight">REMOVED FROM SESSION</h2>
+          <p className="text-xs text-slate-600 mt-2 leading-relaxed">
             You have received 3 confirmed anti-cheat warnings (tab switches, window focus loss, or leaving the quiz window).
           </p>
-          <div className="my-6 p-4 rounded-xl bg-rose-900/20 border border-rose-800/40 text-left text-xs space-y-2">
-            <p className="font-semibold text-rose-200">Session Rules Enforcement:</p>
-            <ul className="list-disc pl-4 text-rose-300/70 space-y-1">
+          <div className="my-6 p-4 rounded-xl bg-rose-50/60 border border-rose-100 text-left text-xs space-y-2">
+            <p className="font-semibold text-rose-800">Session Rules Enforcement:</p>
+            <ul className="list-disc pl-4 text-rose-700/80 space-y-1">
               <li>Answering is permanently disabled for this session.</li>
               <li>Your previous score and rankings will no longer apply.</li>
               <li>You cannot rejoin this active session with another tab.</li>
@@ -512,7 +512,7 @@ export default function ParticipantPlayPage() {
                 router.push('/');
               }
             }}
-            className="w-full py-3 rounded-xl bg-rose-800 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-md"
           >
             Return to Join Screen
           </button>
@@ -522,7 +522,7 @@ export default function ParticipantPlayPage() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#F7F4FE] via-white to-[#EDE8FD] dark:from-[#020205] dark:via-[#030926] dark:to-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
       {/* Network Disconnect Warning Banner */}
       {!isConnected && (
         <div className="w-full bg-rose-600 text-white text-xs font-bold py-2 px-4 text-center flex items-center justify-center gap-2 shadow-md">
@@ -532,14 +532,14 @@ export default function ParticipantPlayPage() {
       )}
 
       {/* Top Bar */}
-      <header className="w-full max-w-2xl mx-auto flex items-center justify-between py-2 border-b border-slate-200 dark:border-brand-cardBorderDark/50">
+      <header className="w-full max-w-2xl mx-auto flex items-center justify-between py-2 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-brand-purple/40">
+          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-brand-purple/40 shadow-sm">
             <Image src="/logo.png" alt="Logo" fill className="object-contain" />
           </div>
           <div>
             <h1 className="text-xs font-bold text-brand-purple">USICT GBU</h1>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">{participantName}</p>
+            <p className="text-[10px] text-slate-500 font-medium">{participantName}</p>
           </div>
         </div>
 
@@ -548,14 +548,14 @@ export default function ParticipantPlayPage() {
           <button
             onClick={toggleFullscreen}
             title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            className="p-1.5 rounded-lg bg-slate-200 dark:bg-brand-cardDark text-slate-700 dark:text-slate-300 hover:text-brand-purple transition-all"
+            className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:text-brand-purple hover:bg-slate-200 transition-all border border-slate-200"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
 
           {/* Warning Badge */}
           {!showCompletionScreen && warningCount > 0 && (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-300">
               <AlertTriangle className="w-3 h-3" />
               <span>
                 {warningCount}/3 {warningCount === 1 ? 'Warning' : 'Warnings'}
@@ -569,15 +569,15 @@ export default function ParticipantPlayPage() {
 
       {/* Anti-Cheat Warning Modal (Warning 1 & 2) */}
       {showWarningModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-sm p-6 rounded-2xl bg-white dark:bg-[#070E28] border border-amber-500 text-center shadow-2xl animate-in zoom-in-95">
-            <div className="w-12 h-12 mx-auto rounded-full bg-amber-500/20 flex items-center justify-center text-amber-500 mb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-sm p-6 rounded-2xl bg-white border border-amber-300 text-center shadow-2xl animate-in zoom-in-95">
+            <div className="w-12 h-12 mx-auto rounded-full bg-amber-50 flex items-center justify-center text-amber-600 mb-3 border border-amber-200">
               <AlertTriangle className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-amber-600 dark:text-amber-400 uppercase tracking-tight">
+            <h3 className="text-lg font-bold text-amber-700 uppercase tracking-tight">
               Anti-Cheat Warning {showWarningModal} of 3
             </h3>
-            <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 leading-relaxed">
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">
               You navigated away from the quiz window or switched tabs.
               {showWarningModal === 1 && ' This is your 1st warning. Please remain on this screen.'}
               {showWarningModal === 2 && ' CAUTION: A 3rd violation will cause IMMEDIATE REMOVAL.'}
@@ -605,15 +605,15 @@ export default function ParticipantPlayPage() {
         {(showCompletionScreen ||
           sessionState?.current_state === 'FINAL_RESULTS' ||
           sessionState?.current_state === 'COMPLETED') && (
-          <div className="p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-2xl text-center">
-            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/15 text-emerald-500 flex items-center justify-center mb-4 border border-emerald-500/30">
+          <div className="p-8 rounded-2xl bg-white border border-slate-200 shadow-xl text-center">
+            <div className="w-16 h-16 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mb-4 border border-emerald-200">
               <CheckCircle2 className="w-9 h-9" />
             </div>
-            <h2 className="text-2xl font-black text-brand-navy dark:text-white">Answers Successfully Submitted!</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mt-3 leading-relaxed">
+            <h2 className="text-2xl font-black text-brand-navy">Answers Successfully Submitted!</h2>
+            <p className="text-sm text-slate-600 mt-3 leading-relaxed">
               Thank you for participating with USICT GBU Programming Club. Your responses and response times have been safely recorded.
             </p>
-            <div className="mt-4 p-3.5 rounded-xl bg-slate-100 dark:bg-brand-cardDark/80 border border-slate-200 dark:border-brand-cardBorderDark text-xs text-slate-500 dark:text-slate-400">
+            <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
               Winners and top performers will be announced directly by the Organizer.
             </div>
             <button
@@ -630,10 +630,10 @@ export default function ParticipantPlayPage() {
         {/* 1. WAITING FOR ORGANIZER TO START (Only before Q1)       */}
         {/* -------------------------------------------------------- */}
         {!showCompletionScreen && sessionState?.current_state === 'WAITING' && (
-          <div className="text-center p-8 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
+          <div className="text-center p-8 rounded-2xl bg-white border border-slate-200 shadow-xl">
             <div className="w-12 h-12 border-2 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-brand-navy dark:text-white">Waiting for Quiz to Start...</h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            <h2 className="text-xl font-bold text-brand-navy">Waiting for Quiz to Start...</h2>
+            <p className="text-xs text-slate-500 mt-1">
               Organizer will start the quiz shortly. Please remain on this screen.
             </p>
           </div>
@@ -662,8 +662,8 @@ export default function ParticipantPlayPage() {
                         i < myQuestionIndex
                           ? 'bg-emerald-500'
                           : i === myQuestionIndex
-                          ? 'bg-brand-purple ring-2 ring-brand-purple/40 ring-offset-1 dark:ring-offset-[#020205]'
-                          : 'bg-slate-200 dark:bg-slate-800'
+                          ? 'bg-brand-purple ring-2 ring-brand-purple/40 ring-offset-1 ring-offset-white'
+                          : 'bg-slate-200'
                       }`}
                       title={`Question ${i + 1}`}
                     />
@@ -671,7 +671,7 @@ export default function ParticipantPlayPage() {
                 </div>
 
                 {/* Question Progress & Timer Bar */}
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
+                <div className="flex items-center justify-between p-3.5 rounded-xl bg-white border border-slate-200 shadow-sm">
                   <div className="text-xs font-bold text-brand-purple tracking-wide">
                     Question {myQuestionIndex + 1} of {totalQ}
                   </div>
@@ -681,7 +681,7 @@ export default function ParticipantPlayPage() {
                     className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-bold transition-all ${
                       timerRemainingSec <= 5
                         ? 'bg-rose-500 text-white animate-pulse'
-                        : 'bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple'
+                        : 'bg-brand-purple/10 text-brand-purple'
                     }`}
                   >
                     <Clock className="w-3.5 h-3.5" />
@@ -690,8 +690,8 @@ export default function ParticipantPlayPage() {
                 </div>
 
                 {/* Question Card */}
-                <div className="p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-lg">
-                  <h2 className="text-lg sm:text-xl font-bold leading-snug tracking-tight text-brand-navy dark:text-white">
+                <div className="p-6 rounded-2xl bg-white border border-slate-200 shadow-lg">
+                  <h2 className="text-lg sm:text-xl font-bold leading-snug tracking-tight text-brand-navy">
                     {currentQ.question_text}
                   </h2>
                 </div>
@@ -710,17 +710,17 @@ export default function ParticipantPlayPage() {
                         disabled={isSubmitting || submitted}
                         className={`p-4 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer select-none active:scale-[0.99] ${
                           isSelected
-                            ? 'bg-brand-purple/15 text-brand-navy dark:text-white border-brand-purple ring-2 ring-brand-purple/60 shadow-md font-semibold'
+                            ? 'bg-brand-purple/10 text-brand-navy border-brand-purple ring-2 ring-brand-purple/50 shadow-md font-semibold'
                             : isSubmitting || submitted
-                            ? 'opacity-60 bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800'
-                            : 'bg-white/90 dark:bg-brand-cardDark/90 border-slate-300 dark:border-brand-cardBorderDark hover:border-brand-purple/60 hover:bg-brand-purple/5'
+                            ? 'opacity-60 bg-slate-100 border-slate-200'
+                            : 'bg-white border-slate-200 hover:border-brand-purple/60 hover:bg-brand-purple/5 shadow-sm'
                         }`}
                       >
                         <span
                           className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-colors ${
                             isSelected
                               ? 'bg-brand-purple text-white shadow-sm'
-                              : 'bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
+                              : 'bg-slate-100 text-slate-700'
                           }`}
                         >
                           {isSelected ? '✓' : optionLetters[idx]}
@@ -733,17 +733,17 @@ export default function ParticipantPlayPage() {
 
                 {/* Confirm & Submit Action Card (Like a proper quiz website) */}
                 <div className="pt-2">
-                  <div className="p-4 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-md space-y-3">
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-md space-y-3">
                     {selectedOption !== null ? (
                       <div className="flex items-center justify-between text-xs px-1">
                         <div className="flex items-center gap-1.5 text-brand-purple font-semibold">
                           <CheckCircle2 className="w-4 h-4" />
                           <span>Option {['A', 'B', 'C', 'D'][selectedOption]} selected</span>
                         </div>
-                        <span className="text-slate-500 dark:text-slate-400">Tap another option to change</span>
+                        <span className="text-slate-500">Tap another option to change</span>
                       </div>
                     ) : (
-                      <div className="text-xs text-center text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-center text-slate-500">
                         Select an option above to unlock submission
                       </div>
                     )}
@@ -755,7 +755,7 @@ export default function ParticipantPlayPage() {
                       className={`w-full py-3.5 px-5 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all shadow-md ${
                         selectedOption !== null && !isSubmitting && !submitted
                           ? 'bg-brand-purple hover:bg-[#6A1694] text-white cursor-pointer active:scale-[0.98] shadow-brand-purple/25'
-                          : 'bg-slate-100 dark:bg-slate-800/80 text-slate-400 dark:text-slate-500 cursor-not-allowed border border-slate-200 dark:border-slate-700'
+                          : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
                       }`}
                     >
                       {isSubmitting ? (
@@ -773,7 +773,7 @@ export default function ParticipantPlayPage() {
                       )}
                     </button>
 
-                    <p className="text-[11px] text-center text-slate-500 dark:text-slate-400 flex items-center justify-center gap-1">
+                    <p className="text-[11px] text-center text-slate-500 flex items-center justify-center gap-1">
                       <span>🔒 Once confirmed, your answer is locked and you cannot return.</span>
                     </p>
                   </div>
@@ -785,7 +785,7 @@ export default function ParticipantPlayPage() {
       </div>
 
       {/* Footer */}
-      <footer className="w-full max-w-2xl mx-auto text-center py-2 text-[11px] text-slate-500 dark:text-slate-400">
+      <footer className="w-full max-w-2xl mx-auto text-center py-2 text-[11px] text-slate-500">
         <p>USICT GBU Programming Club • LEARN • CONNECT • EXPLORE • GROW</p>
       </footer>
     </main>

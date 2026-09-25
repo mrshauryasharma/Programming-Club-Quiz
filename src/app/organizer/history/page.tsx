@@ -100,13 +100,13 @@ export default function OrganizerHistoryPage() {
   }, [history]);
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-[#F7F4FE] dark:bg-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
       {/* Organizer Header */}
-      <header className="max-w-6xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200 dark:border-brand-cardBorderDark">
+      <header className="max-w-6xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <Link
             href="/organizer/dashboard"
-            className="p-2 rounded-xl bg-slate-200 dark:bg-brand-cardDark text-slate-700 dark:text-slate-300 hover:text-brand-purple dark:hover:text-purple-400 transition-colors"
+            className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-brand-purple hover:bg-slate-200 transition-colors"
             title="Back to Dashboard"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -119,11 +119,11 @@ export default function OrganizerHistoryPage() {
               <h1 className="text-base sm:text-lg font-black text-brand-purple uppercase">
                 USICT GBU PROGRAMMING CLUB
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-brand-purple/10 text-brand-purple dark:text-purple-300">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-brand-purple/10 text-brand-purple">
                 ORGANIZER
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <p className="text-xs text-slate-500 font-medium">
               Quiz Event History & Analytics Archive
             </p>
           </div>
@@ -132,7 +132,7 @@ export default function OrganizerHistoryPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/organizer/dashboard"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-brand-purple dark:hover:text-purple-300 transition-colors"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-brand-purple transition-colors"
           >
             <span>Dashboard</span>
           </Link>
@@ -149,30 +149,30 @@ export default function OrganizerHistoryPage() {
               <History className="w-5 h-5" />
               <span className="text-xs font-extrabold uppercase tracking-wider">Historical Archive</span>
             </div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight mt-1">Quiz Events Conducted</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-brand-navy mt-1">Quiz Events Conducted</h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Each live session is stored as an independent quiz event with its own code, participants, and verified results.
             </p>
           </div>
 
           {/* Quick Stats Pill */}
           <div className="flex items-center gap-3">
-            <div className="px-4 py-2 rounded-2xl bg-white dark:bg-brand-cardDark border border-slate-200 dark:border-brand-cardBorderDark shadow-sm flex items-center gap-3">
+            <div className="px-4 py-2 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center gap-3">
               <div>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Events</p>
                 <p className="text-lg font-black text-brand-purple">{history.length}</p>
               </div>
-              <div className="h-8 w-px bg-slate-200 dark:bg-slate-700" />
+              <div className="h-8 w-px bg-slate-200" />
               <div>
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Participants</p>
-                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400">{totalParticipantsConducted}</p>
+                <p className="text-lg font-black text-emerald-600">{totalParticipantsConducted}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Filter & Search Bar */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white dark:bg-brand-cardDark border border-slate-200 dark:border-brand-cardBorderDark shadow-sm">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-2xl bg-white border border-slate-200 shadow-sm">
           {/* Search Input */}
           <div className="relative flex-1">
             <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -181,7 +181,7 @@ export default function OrganizerHistoryPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by quiz title or game code (e.g. ABC123)..."
-              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-[#031246] dark:text-[#F7F4FE] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-purple"
+              className="w-full pl-10 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 text-[#031246] placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-purple"
             />
           </div>
 
@@ -194,7 +194,7 @@ export default function OrganizerHistoryPage() {
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   statusFilter === s
                     ? 'bg-brand-purple text-white shadow-sm'
-                    : 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 {s === 'ALL' ? 'All Events' : s.charAt(0) + s.slice(1).toLowerCase()}
@@ -210,14 +210,14 @@ export default function OrganizerHistoryPage() {
             <p className="text-xs text-slate-500">Loading quiz events archive...</p>
           </div>
         ) : filteredHistory.length === 0 ? (
-          <div className="text-center py-16 p-8 rounded-3xl bg-white/60 dark:bg-brand-cardDark/60 border border-dashed border-slate-300 dark:border-brand-cardBorderDark">
+          <div className="text-center py-16 p-8 rounded-3xl bg-white border border-dashed border-slate-300">
             <div className="w-14 h-14 rounded-2xl bg-brand-purple/10 flex items-center justify-center mx-auto mb-4 text-brand-purple">
               <History className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-bold">
+            <h3 className="text-lg font-bold text-brand-navy">
               {searchQuery ? 'No matching quiz events found' : 'No Quiz Events Conducted Yet'}
             </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-1">
+            <p className="text-xs text-slate-500 max-w-md mx-auto mt-1">
               {searchQuery
                 ? `No event matches "${searchQuery}". Try searching with a different quiz title or game code.`
                 : 'Whenever an Organizer launches a live session from the dashboard, it is archived here as a standalone event with complete analytics.'}
@@ -245,27 +245,27 @@ export default function OrganizerHistoryPage() {
               return (
                 <div
                   key={event.id}
-                  className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-brand-cardDark border border-slate-200 dark:border-brand-cardBorderDark shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
+                  className="p-5 sm:p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5"
                 >
                   {/* Left Column: Title, Code, Status & Timing */}
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="font-mono text-sm font-black px-2.5 py-1 rounded-lg bg-brand-purple/10 text-brand-purple dark:text-purple-300 border border-brand-purple/20">
+                      <span className="font-mono text-sm font-black px-2.5 py-1 rounded-lg bg-brand-purple/10 text-brand-purple border border-brand-purple/20">
                         {event.game_code}
                       </span>
 
                       {isFinished ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3" />
                           <span>COMPLETED</span>
                         </span>
                       ) : isActive ? (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center gap-1 animate-pulse">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 animate-pulse">
                           <Radio className="w-3 h-3" />
                           <span>LIVE ACTIVE</span>
                         </span>
                       ) : (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center gap-1">
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200 flex items-center gap-1">
                           <Clock className="w-3 h-3" />
                           <span>WAITING TO START</span>
                         </span>
@@ -276,9 +276,9 @@ export default function OrganizerHistoryPage() {
                       </span>
                     </div>
 
-                    <h3 className="text-lg font-black tracking-tight">{event.quiz_title}</h3>
+                    <h3 className="text-lg font-black tracking-tight text-brand-navy">{event.quiz_title}</h3>
 
-                    <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                    <div className="flex items-center gap-4 text-xs text-slate-500 flex-wrap">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-brand-purple" />
                         <span>{new Date(event.created_at).toLocaleString()}</span>
@@ -293,30 +293,30 @@ export default function OrganizerHistoryPage() {
                   </div>
 
                   {/* Middle Column: Key Metrics */}
-                  <div className="flex items-center gap-6 py-2 px-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 self-stretch sm:self-auto justify-around sm:justify-start">
+                  <div className="flex items-center gap-6 py-2 px-4 rounded-xl bg-slate-50 border border-slate-200 self-stretch sm:self-auto justify-around sm:justify-start">
                     <div className="text-center sm:text-left">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                         <Users className="w-3 h-3 text-brand-purple" />
                         <span>Participants</span>
                       </p>
-                      <p className="text-base font-black mt-0.5">{event.total_participants}</p>
+                      <p className="text-base font-black text-brand-navy mt-0.5">{event.total_participants}</p>
                     </div>
 
-                    <div className="h-7 w-px bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-7 w-px bg-slate-200" />
 
                     <div className="text-center sm:text-left">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                         <Award className="w-3 h-3 text-amber-500" />
                         <span>Avg Score</span>
                       </p>
-                      <p className="text-base font-black mt-0.5">{event.average_score} <span className="text-[10px] text-slate-400 font-normal">pts</span></p>
+                      <p className="text-base font-black text-brand-navy mt-0.5">{event.average_score} <span className="text-[10px] text-slate-400 font-normal">pts</span></p>
                     </div>
 
-                    <div className="h-7 w-px bg-slate-200 dark:bg-slate-700" />
+                    <div className="h-7 w-px bg-slate-200" />
 
                     <div className="text-center sm:text-left">
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Questions</p>
-                      <p className="text-base font-black mt-0.5">{event.total_questions}</p>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Questions</p>
+                      <p className="text-base font-black text-brand-navy mt-0.5">{event.total_questions}</p>
                     </div>
                   </div>
 
@@ -338,7 +338,7 @@ export default function OrganizerHistoryPage() {
                         href={`/api/sessions/${event.game_code}/export/csv`}
                         download
                         title="Download CSV"
-                        className="p-2 rounded-xl bg-emerald-700/10 hover:bg-emerald-700/20 text-emerald-700 dark:text-emerald-400 transition-colors"
+                        className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors border border-emerald-200"
                       >
                         <FileText className="w-4 h-4" />
                       </a>
@@ -346,7 +346,7 @@ export default function OrganizerHistoryPage() {
                         href={`/api/sessions/${event.game_code}/export/excel`}
                         download
                         title="Download Excel (.xlsx)"
-                        className="p-2 rounded-xl bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-600 dark:text-emerald-300 transition-colors"
+                        className="p-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-colors border border-emerald-200"
                       >
                         <FileSpreadsheet className="w-4 h-4" />
                       </a>
@@ -354,7 +354,7 @@ export default function OrganizerHistoryPage() {
                         href={`/api/sessions/${event.game_code}/export/pdf`}
                         download
                         title="Download PDF"
-                        className="p-2 rounded-xl bg-rose-600/10 hover:bg-rose-600/20 text-rose-600 dark:text-rose-400 transition-colors"
+                        className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors border border-rose-200"
                       >
                         <FileText className="w-4 h-4" />
                       </a>
@@ -367,7 +367,7 @@ export default function OrganizerHistoryPage() {
                         setEventToDelete(event);
                       }}
                       title="Delete this quiz event"
-                      className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-400 transition-colors cursor-pointer"
+                      className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 transition-colors cursor-pointer border border-rose-200"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -376,7 +376,7 @@ export default function OrganizerHistoryPage() {
                     {!isFinished && (
                       <Link
                         href={`/organizer/session/${event.game_code}`}
-                        className="px-3 py-2 rounded-xl bg-slate-200 dark:bg-brand-cardDark hover:bg-brand-purple hover:text-white text-slate-700 dark:text-slate-300 text-xs font-bold flex items-center gap-1 transition-all"
+                        className="px-3 py-2 rounded-xl bg-slate-100 hover:bg-brand-purple hover:text-white text-slate-700 text-xs font-bold flex items-center gap-1 transition-all border border-slate-200"
                         title="Open Live Host Console"
                       >
                         <Play className="w-3 h-3 fill-current" />
@@ -393,46 +393,46 @@ export default function OrganizerHistoryPage() {
 
       {/* Delete Event Confirmation Modal */}
       {eventToDelete && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-white dark:bg-brand-cardDark border border-slate-200 dark:border-brand-cardBorderDark rounded-2xl shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in duration-150">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in duration-150">
             <div className="flex items-center gap-3 text-rose-600">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center border border-rose-200">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-base font-black">Delete Quiz Event</h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400">Irreversible Action</p>
+                <h3 className="text-base font-black text-rose-700">Delete Quiz Event</h3>
+                <p className="text-xs text-slate-500">Irreversible Action</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-600 leading-relaxed">
               Are you sure you want to delete this specific quiz event? This will permanently remove its live session records, participant submissions, and results.
             </p>
 
-            <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-1.5 font-mono">
-              <div><span className="text-slate-400 font-sans font-bold">Quiz:</span> {eventToDelete.quiz_title}</div>
-              <div><span className="text-slate-400 font-sans font-bold">Game Code:</span> <span className="font-bold text-brand-purple">{eventToDelete.game_code}</span></div>
-              <div><span className="text-slate-400 font-sans font-bold">Event ID:</span> {eventToDelete.id}</div>
-              <div><span className="text-slate-400 font-sans font-bold">Date:</span> {new Date(eventToDelete.created_at).toLocaleString()}</div>
-              <div><span className="text-slate-400 font-sans font-bold">Participants:</span> {eventToDelete.total_participants}</div>
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1.5 font-mono">
+              <div><span className="text-slate-500 font-sans font-bold">Quiz:</span> {eventToDelete.quiz_title}</div>
+              <div><span className="text-slate-500 font-sans font-bold">Game Code:</span> <span className="font-bold text-brand-purple">{eventToDelete.game_code}</span></div>
+              <div><span className="text-slate-500 font-sans font-bold">Event ID:</span> {eventToDelete.id}</div>
+              <div><span className="text-slate-500 font-sans font-bold">Date:</span> {new Date(eventToDelete.created_at).toLocaleString()}</div>
+              <div><span className="text-slate-500 font-sans font-bold">Participants:</span> {eventToDelete.total_participants}</div>
             </div>
 
-            <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300">
+            <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-800">
               <strong>Notice:</strong> The original quiz template itself will <strong>NOT</strong> be deleted and remains available for future quiz sessions.
             </div>
 
             {deleteError && (
-              <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400">
+              <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700">
                 {deleteError}
               </div>
             )}
 
-            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => setEventToDelete(null)}
                 disabled={isDeleting}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 Cancel
               </button>

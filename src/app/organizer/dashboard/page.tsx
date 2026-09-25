@@ -79,9 +79,9 @@ export default function OrganizerDashboardPage() {
   };
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-[#F7F4FE] dark:bg-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
       {/* Organizer Header */}
-      <header className="max-w-6xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200 dark:border-brand-cardBorderDark">
+      <header className="max-w-6xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200">
         <div className="flex items-center gap-3">
           <div className="relative w-11 h-11 rounded-full overflow-hidden border-2 border-brand-purple shadow-sm">
             <Image src="/logo.png" alt="Logo" fill className="object-contain" priority />
@@ -95,7 +95,7 @@ export default function OrganizerDashboardPage() {
                 ORGANIZER
               </span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <p className="text-xs text-slate-500 font-medium">
               Quiz & Live Session Management
             </p>
           </div>
@@ -104,7 +104,7 @@ export default function OrganizerDashboardPage() {
         <div className="flex items-center gap-3">
           <Link
             href="/organizer/history"
-            className="px-3.5 py-1.5 rounded-xl bg-slate-200 dark:bg-brand-cardDark text-slate-700 dark:text-slate-200 hover:bg-brand-purple hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-3.5 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:bg-brand-purple hover:text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm"
           >
             <History className="w-4 h-4" />
             <span>History</span>
@@ -113,7 +113,7 @@ export default function OrganizerDashboardPage() {
           <button
             onClick={handleLogout}
             title="Logout"
-            className="p-2 rounded-xl bg-slate-200 dark:bg-brand-cardDark text-slate-600 dark:text-slate-400 hover:text-rose-500 transition-colors"
+            className="p-2 rounded-xl bg-slate-100 border border-slate-200 text-slate-600 hover:text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -125,8 +125,8 @@ export default function OrganizerDashboardPage() {
         {/* Actions Bar */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">Quiz Library</h2>
-            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-brand-navy">Quiz Library</h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               Create, preview, and host real-time technical quizzes for club workshops and competitions.
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function OrganizerDashboardPage() {
           <div className="flex items-center gap-3 flex-wrap">
             <Link
               href="/organizer/history"
-              className="px-4 py-2.5 rounded-xl border border-brand-purple/30 dark:border-brand-purple/40 bg-brand-purple/10 hover:bg-brand-purple/20 text-brand-purple dark:text-purple-300 font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-sm"
+              className="px-4 py-2.5 rounded-xl border border-brand-purple/30 bg-brand-purple/10 hover:bg-brand-purple/20 text-brand-purple font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all cursor-pointer shadow-sm"
             >
               <History className="w-4 h-4" />
               <span>Event History</span>
@@ -157,9 +157,9 @@ export default function OrganizerDashboardPage() {
             <p className="text-xs text-slate-500">Loading quizzes...</p>
           </div>
         ) : quizzes.length === 0 ? (
-          <div className="text-center py-16 p-8 rounded-3xl bg-white dark:bg-brand-cardDark border border-slate-200 dark:border-brand-cardBorderDark">
+          <div className="text-center py-16 p-8 rounded-3xl bg-white border border-slate-200 shadow-sm">
             <FileText className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <h3 className="text-lg font-bold">No quizzes available</h3>
+            <h3 className="text-lg font-bold text-brand-navy">No quizzes available</h3>
             <p className="text-xs text-slate-500 mt-1">Get started by creating your first quiz.</p>
           </div>
         ) : (
@@ -167,11 +167,11 @@ export default function OrganizerDashboardPage() {
             {quizzes.map((quiz) => (
               <div
                 key={quiz.id}
-                className="flex flex-col justify-between p-6 rounded-2xl bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark shadow-md hover:shadow-lg transition-all"
+                className="flex flex-col justify-between p-6 rounded-2xl bg-white border border-slate-200 shadow-md hover:shadow-lg transition-all"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="text-base font-bold text-brand-navy dark:text-white leading-snug">
+                    <h3 className="text-base font-bold text-brand-navy leading-snug">
                       {quiz.title}
                     </h3>
                     <div className="flex items-center gap-1">
@@ -184,18 +184,18 @@ export default function OrganizerDashboardPage() {
                       </Link>
                       <button
                         onClick={() => handleDeleteQuiz(quiz.id)}
-                        className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+                        className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"
                         title="Delete quiz"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
-                  <p className="text-xs text-slate-500 dark:text-brand-slate line-clamp-2 mb-4 leading-relaxed">
+                  <p className="text-xs text-slate-500 line-clamp-2 mb-4 leading-relaxed">
                     {quiz.description || 'USICT GBU Programming Club Technical Quiz'}
                   </p>
 
-                  <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-6">
+                  <div className="flex items-center gap-3 text-xs text-slate-500 mb-6">
                     <span className="font-semibold text-brand-purple">
                       {quiz.question_count ?? quiz.questions?.length ?? 0} Questions
                     </span>
@@ -208,7 +208,7 @@ export default function OrganizerDashboardPage() {
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/organizer/quizzes/${quiz.id}/edit`}
-                    className="py-3 px-3.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-slate-700 hover:border-brand-purple/50 bg-slate-50 dark:bg-slate-800/60 hover:bg-brand-purple/10 text-slate-700 dark:text-slate-200 hover:text-brand-purple flex items-center justify-center gap-1.5 transition-all shadow-sm"
+                    className="py-3 px-3.5 rounded-xl font-bold text-xs border border-slate-200 hover:border-brand-purple/50 bg-slate-50 hover:bg-brand-purple/10 text-slate-700 hover:text-brand-purple flex items-center justify-center gap-1.5 transition-all shadow-sm"
                     title="Edit Questions & Settings"
                   >
                     <Edit3 className="w-4 h-4" />

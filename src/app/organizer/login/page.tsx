@@ -38,7 +38,7 @@ export default function OrganizerLoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#F7F4FE] via-white to-[#EDE8FD] dark:from-[#020205] dark:via-[#030926] dark:to-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
       {/* Top Bar */}
       <header className="w-full max-w-md mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2.5">
@@ -47,7 +47,7 @@ export default function OrganizerLoginPage() {
           </div>
           <div>
             <h1 className="text-xs font-bold uppercase text-brand-purple">USICT GBU</h1>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Programming Club</p>
+            <p className="text-[10px] text-slate-500 font-medium">Programming Club</p>
           </div>
         </div>
         <ThemeToggle />
@@ -55,18 +55,18 @@ export default function OrganizerLoginPage() {
 
       {/* Main Login Card */}
       <div className="w-full max-w-md mx-auto my-auto py-6">
-        <div className="bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark rounded-2xl p-8 shadow-xl backdrop-blur-md text-center">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-8 shadow-xl shadow-slate-200/60 text-center">
           <div className="w-14 h-14 mx-auto rounded-2xl bg-brand-purple/10 text-brand-purple flex items-center justify-center mb-4">
             <ShieldCheck className="w-8 h-8" />
           </div>
 
-          <h2 className="text-2xl font-black tracking-tight">Organizer Portal</h2>
-          <p className="text-xs text-slate-500 dark:text-brand-slate mt-1 font-medium">
+          <h2 className="text-2xl font-black tracking-tight text-brand-navy">Organizer Portal</h2>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
             Authorized access for Programming Club Organizers
           </p>
 
           {error && (
-            <div className="mt-4 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2">
+            <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0" />
               <span>{error}</span>
             </div>
@@ -74,7 +74,7 @@ export default function OrganizerLoginPage() {
 
           <form onSubmit={handleLogin} className="mt-6 space-y-4 text-left">
             <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase">
                 Access Password
               </label>
               <div className="relative">
@@ -84,7 +84,7 @@ export default function OrganizerLoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter organizer password"
                   required
-                  className="w-full px-4 py-3 pl-10 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
+                  className="w-full px-4 py-3 pl-10 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
                 />
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
               </div>
@@ -108,7 +108,7 @@ export default function OrganizerLoginPage() {
         </div>
       </div>
 
-      <footer className="w-full max-w-md mx-auto text-center py-2 text-[11px] text-slate-500 dark:text-slate-400">
+      <footer className="w-full max-w-md mx-auto text-center py-2 text-[11px] text-slate-500">
         <p>Protected Organizer Route • Programming Club</p>
       </footer>
     </main>

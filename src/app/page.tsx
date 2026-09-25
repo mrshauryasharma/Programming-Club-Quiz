@@ -210,7 +210,7 @@ function JoinQuizFlowContent() {
   const departmentOptions = [...OFFICIAL_DEPARTMENTS, 'Other'];
 
   return (
-    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 md:p-8 bg-gradient-to-b from-[#F7F4FE] via-white to-[#EDE8FD] dark:from-[#020205] dark:via-[#030926] dark:to-[#020205] text-[#031246] dark:text-[#F7F4FE]">
+    <main className="min-h-screen flex flex-col justify-between p-4 sm:p-6 md:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
       {/* Top Header Bar */}
       <header className="w-full max-w-md mx-auto flex items-center justify-between py-2">
         <div className="flex items-center gap-2.5">
@@ -227,7 +227,7 @@ function JoinQuizFlowContent() {
             <h1 className="text-xs font-bold uppercase tracking-wider text-brand-purple">
               USICT GBU
             </h1>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+            <p className="text-[11px] text-slate-500 font-medium">
               Programming Club
             </p>
           </div>
@@ -238,16 +238,16 @@ function JoinQuizFlowContent() {
 
       {/* Main Registration Card */}
       <div className="w-full max-w-md mx-auto my-auto py-6">
-        <div className="bg-white/95 dark:bg-brand-cardDark/95 border border-slate-200 dark:border-brand-cardBorderDark rounded-2xl p-6 sm:p-8 shadow-xl backdrop-blur-md">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-xl shadow-slate-200/60 backdrop-blur-md">
           {/* Header Title */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-brand-purple/10 dark:bg-brand-purple/20 text-brand-purple mb-2">
+            <div className="inline-flex items-center justify-center p-3 rounded-2xl bg-brand-purple/10 text-brand-purple mb-2">
               <Sparkles className="w-6 h-6" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-brand-navy">
               Programming Club Quiz
             </h2>
-            <p className="text-xs text-slate-500 dark:text-brand-slate mt-1 font-medium tracking-wide">
+            <p className="text-xs text-slate-500 mt-1 font-medium tracking-wide">
               LEARN • CONNECT • EXPLORE • GROW
             </p>
           </div>
@@ -268,19 +268,19 @@ function JoinQuizFlowContent() {
                         ? 'bg-brand-purple text-white ring-4 ring-brand-purple/20'
                         : currentStep > st.num
                         ? 'bg-emerald-500 text-white'
-                        : 'bg-slate-200 dark:bg-slate-800 text-slate-500'
+                        : 'bg-slate-200 text-slate-500'
                     }`}
                   >
                     {currentStep > st.num ? '✓' : st.num}
                   </div>
-                  <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-1">
+                  <span className="text-[10px] font-semibold text-slate-500 mt-1">
                     {st.label}
                   </span>
                 </div>
                 {idx < 3 && (
                   <div
                     className={`flex-1 h-0.5 mx-1.5 transition-colors ${
-                      currentStep > idx + 1 ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-800'
+                      currentStep > idx + 1 ? 'bg-emerald-500' : 'bg-slate-200'
                     }`}
                   />
                 )}
@@ -290,7 +290,7 @@ function JoinQuizFlowContent() {
 
           {/* Error Banner */}
           {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs flex items-start gap-2.5">
+            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
               <span>{error}</span>
             </div>
@@ -305,7 +305,7 @@ function JoinQuizFlowContent() {
                 <div className="flex items-center justify-between mb-1.5">
                   <label
                     htmlFor="gameCode"
-                    className="text-xs font-bold tracking-wide uppercase text-slate-600 dark:text-slate-300 flex items-center gap-1.5"
+                    className="text-xs font-bold tracking-wide uppercase text-slate-700 flex items-center gap-1.5"
                   >
                     <KeyRound className="w-3.5 h-3.5 text-brand-purple" />
                     <span>Game Code</span>
@@ -322,7 +322,7 @@ function JoinQuizFlowContent() {
                     setError(null);
                   }}
                   placeholder="e.g. ABC123"
-                  className="w-full px-4 py-3.5 rounded-xl font-mono text-center tracking-widest text-xl font-black uppercase bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                  className="w-full px-4 py-3.5 rounded-xl font-mono text-center tracking-widest text-xl font-black uppercase bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all placeholder:text-slate-400 text-slate-900"
                 />
               </div>
 
@@ -349,14 +349,14 @@ function JoinQuizFlowContent() {
           {/* ============================================================ */}
           {currentStep === 2 && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-brand-cardBorderDark/40">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
                     setError(null);
                     setCurrentStep(1);
                   }}
-                  className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1"
+                  className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1 cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Change Code</span>
@@ -369,12 +369,12 @@ function JoinQuizFlowContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-brand-navy dark:text-white mb-2 flex items-center gap-2">
+                <label className="block text-sm font-bold text-brand-navy mb-2 flex items-center gap-2">
                   <GraduationCap className="w-4 h-4 text-brand-purple" />
                   <span>Select your Year</span>
                   <span className="text-brand-purple">*</span>
                 </label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                <p className="text-xs text-slate-500 mb-4">
                   Please select your current academic year to proceed.
                 </p>
 
@@ -387,7 +387,7 @@ function JoinQuizFlowContent() {
                       className={`p-3.5 rounded-xl border text-left font-bold text-xs flex items-center justify-between transition-all cursor-pointer select-none active:scale-[0.98] ${
                         year === yr
                           ? 'bg-brand-purple text-white border-brand-purple shadow-md'
-                          : 'bg-slate-50 dark:bg-[#080E2B] border-slate-200 dark:border-brand-cardBorderDark hover:border-brand-purple/60 hover:bg-brand-purple/5'
+                          : 'bg-slate-50 border-slate-200 text-slate-800 hover:border-brand-purple/60 hover:bg-brand-purple/5'
                       }`}
                     >
                       <span>{yr}</span>
@@ -404,14 +404,14 @@ function JoinQuizFlowContent() {
           {/* ============================================================ */}
           {currentStep === 3 && (
             <form onSubmit={handleDepartmentContinue} className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-brand-cardBorderDark/40">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
                     setError(null);
                     setCurrentStep(2);
                   }}
-                  className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1"
+                  className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1 cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Change Year ({year})</span>
@@ -422,13 +422,13 @@ function JoinQuizFlowContent() {
               <div>
                 <label
                   htmlFor="departmentSelect"
-                  className="block text-sm font-bold text-brand-navy dark:text-white mb-1.5 flex items-center gap-2"
+                  className="block text-sm font-bold text-brand-navy mb-1.5 flex items-center gap-2"
                 >
                   <Building2 className="w-4 h-4 text-brand-purple" />
                   <span>Department</span>
                   <span className="text-brand-purple">*</span>
                 </label>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                <p className="text-xs text-slate-500 mb-3">
                   Choose your department from the list or select Other.
                 </p>
 
@@ -440,7 +440,7 @@ function JoinQuizFlowContent() {
                     setError(null);
                   }}
                   required
-                  className="w-full px-3.5 py-3 rounded-xl text-xs sm:text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all text-slate-800 dark:text-slate-200 font-medium"
+                  className="w-full px-3.5 py-3 rounded-xl text-xs sm:text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all text-slate-800 font-medium"
                 >
                   <option value="">Select Department</option>
                   {departmentOptions.map((dept) => (
@@ -451,7 +451,7 @@ function JoinQuizFlowContent() {
                 </select>
 
                 {OFFICIAL_DEPARTMENTS.length === 0 && (
-                  <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5">
+                  <p className="text-[11px] text-amber-700 mt-1.5">
                     Official 27 departments pending insertion in src/config/departments.ts. Please select "Other" to specify your department.
                   </p>
                 )}
@@ -462,7 +462,7 @@ function JoinQuizFlowContent() {
                 <div className="pt-2 animate-in fade-in-50">
                   <label
                     htmlFor="customDepartment"
-                    className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1"
+                    className="block text-xs font-bold text-slate-700 mb-1"
                   >
                     Enter your department <span className="text-brand-purple">*</span>
                   </label>
@@ -476,7 +476,7 @@ function JoinQuizFlowContent() {
                     }}
                     placeholder="Type your official department name..."
                     required
-                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all font-medium"
+                    className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all font-medium text-slate-800"
                   />
                 </div>
               )}
@@ -497,19 +497,19 @@ function JoinQuizFlowContent() {
           {/* ============================================================ */}
           {currentStep === 4 && (
             <form onSubmit={handleFinalSubmit} className="space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-brand-cardBorderDark/40">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <button
                   type="button"
                   onClick={() => {
                     setError(null);
                     setCurrentStep(3);
                   }}
-                  className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1"
+                  className="text-xs font-semibold text-slate-500 hover:text-brand-purple flex items-center gap-1 cursor-pointer"
                 >
                   <ArrowLeft className="w-3.5 h-3.5" />
                   <span>Change Dept</span>
                 </button>
-                <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <div className="text-[11px] font-semibold text-slate-500">
                   <span>{year}</span> •{' '}
                   <span className="truncate max-w-[120px] inline-block align-bottom font-bold text-brand-purple">
                     {department === 'Other' ? customDepartment : department}
@@ -518,7 +518,7 @@ function JoinQuizFlowContent() {
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-brand-navy dark:text-white mb-2 flex items-center gap-2">
+                <label className="block text-sm font-bold text-brand-navy mb-2 flex items-center gap-2">
                   <User className="w-4 h-4 text-brand-purple" />
                   <span>Student Information</span>
                 </label>
@@ -528,7 +528,7 @@ function JoinQuizFlowContent() {
               <div>
                 <label
                   htmlFor="name"
-                  className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
                 >
                   Full Name <span className="text-brand-purple">*</span>
                 </label>
@@ -542,7 +542,7 @@ function JoinQuizFlowContent() {
                   }}
                   placeholder="e.g. Rahul Kumar"
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all text-slate-900"
                 />
               </div>
 
@@ -550,7 +550,7 @@ function JoinQuizFlowContent() {
               <div>
                 <label
                   htmlFor="rollNo"
-                  className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
                 >
                   Roll Number <span className="text-brand-purple">*</span>
                 </label>
@@ -564,7 +564,7 @@ function JoinQuizFlowContent() {
                   }}
                   placeholder="e.g. 23CS1042"
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono uppercase bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-mono uppercase bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all text-slate-900"
                 />
               </div>
 
@@ -572,7 +572,7 @@ function JoinQuizFlowContent() {
               <div>
                 <label
                   htmlFor="email"
-                  className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1"
+                  className="block text-xs font-semibold text-slate-700 mb-1"
                 >
                   Email ID <span className="text-brand-purple">*</span>
                 </label>
@@ -586,7 +586,7 @@ function JoinQuizFlowContent() {
                   }}
                   placeholder="e.g. rahul@example.com"
                   required
-                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 dark:bg-[#080E2B] border border-slate-300 dark:border-brand-cardBorderDark focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm bg-slate-50 border border-slate-300 focus:bg-white focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 outline-none transition-all text-slate-900"
                 />
               </div>
 
@@ -611,7 +611,7 @@ function JoinQuizFlowContent() {
       </div>
 
       {/* Footer */}
-      <footer className="w-full max-w-md mx-auto text-center py-2 text-[11px] text-slate-500 dark:text-slate-400">
+      <footer className="w-full max-w-md mx-auto text-center py-2 text-[11px] text-slate-500">
         <p>SOICT • Gautam Buddha University</p>
       </footer>
     </main>
@@ -622,7 +622,7 @@ export default function JoinQuizPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-[#F7F4FE] dark:bg-[#020205]">
+        <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
           <div className="w-8 h-8 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin" />
         </div>
       }
