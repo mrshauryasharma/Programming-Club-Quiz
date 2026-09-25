@@ -39,7 +39,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         'Total Response Time (s)': totalTimeSec,
         'Average Time / Correct (s)': avgTimeSec,
         Status: p.status.toUpperCase(),
+        'Audit Resolution': p.resolved_by || (p.status === 'flagged' ? 'FLAGGED FOR REVIEW' : 'Normal'),
         Warnings: p.warning_count,
+        'Student Appeal Note': p.appeal_note || 'None',
       };
     });
 
@@ -60,7 +62,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         'Total Response Time (s)',
         'Average Time / Correct (s)',
         'Status',
+        'Audit Resolution',
         'Warnings',
+        'Student Appeal Note',
       ];
 
       const csvLines = [headers.join(',')];
@@ -78,7 +82,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
           row['Total Response Time (s)'],
           row['Average Time / Correct (s)'],
           row.Status,
+          `"${(row['Audit Resolution'] || '').replace(/"/g, '""')}"`,
           row.Warnings,
+          `"${(row['Student Appeal Note'] || '').replace(/"/g, '""')}"`,
         ].join(',');
         csvLines.push(line);
       });
@@ -151,7 +157,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       );
 
       const tableHead = [
-        ['Rank', 'Name', 'Roll No', 'Year', 'Department', 'Email', 'Score', 'Correct', 'Total Time (s)', 'Status'],
+        ['Rank', 'Name', 'Roll No', 'Year', 'Department', 'Email', 'Score', 'Time (s)', 'Status', 'Audit / Appeal'],
       ];
 
       const tableBody = dataRows.map(r => [
@@ -162,9 +168,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
         r.Department,
         r.Email,
         r.Score,
-        `${r['Correct Answers']} / ${totalQuestions}`,
         r['Total Response Time (s)'],
         r.Status,
+        r['Student Appeal Note'] !== 'None' ? `${r['Audit Resolution']} (${r['Student Appeal Note']})` : r['Audit Resolution'],
       ]);
 
       autoTable(doc, {

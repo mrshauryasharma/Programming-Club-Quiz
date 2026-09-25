@@ -722,6 +722,9 @@ class QuizRepository {
           email: p.email || 'student@gbu.ac.in',
           warning_count: p.warning_count || 0,
           status: (p.status?.toLowerCase() || 'active') as any,
+          appeal_note: p.appeal_note || '',
+          is_flagged: p.status?.toLowerCase() === 'flagged' || ((p.warning_count || 0) >= 3 && p.status?.toLowerCase() !== 'approved'),
+          resolved_by: p.resolved_by || '',
           total_score: p.score ?? p.total_score ?? 0,
           total_response_time_ms: Number(p.total_response_time_ms || 0),
           joined_at: p.joined_at,
@@ -942,12 +945,15 @@ class QuizRepository {
     };
   }
 
-  // Anti-Cheat Violation (Warning 1, Warning 2, Warning 3 = Immediate Removal)
+  // Anti-Cheat Violation (Warning 1, Warning 2, Warning 3+ = Flagged for Organizer Review)
   public async reportViolation(
     code: string,
     participantId: string,
-    violationType: string
-  ): Promise<{ warning_count: number; status: string; is_removed: boolean }> {
+    violationType: string,
+    durationMs: number = 0,
+    questionIndex: number = 0,
+    details?: string
+  ): Promise<{ warning_count: number; status: string; is_removed: boolean; is_flagged: boolean }> {
     const session = await this.getSessionByCode(code);
     if (!session) throw new Error('Session not found');
 
@@ -955,17 +961,19 @@ class QuizRepository {
     if (!participant) throw new Error('Participant not found');
 
     if (participant.status === 'removed') {
-      return { warning_count: 3, status: 'removed', is_removed: true };
+      return { warning_count: participant.warning_count, status: 'removed', is_removed: true, is_flagged: true };
     }
 
-    participant.warning_count = Math.min(3, participant.warning_count + 1);
+    participant.warning_count = (participant.warning_count || 0) + 1;
 
     if (participant.warning_count === 1) {
       participant.status = 'warning_1';
     } else if (participant.warning_count === 2) {
       participant.status = 'warning_2';
     } else if (participant.warning_count >= 3) {
-      participant.status = 'removed';
+      // Soft Flagging: DO NOT remove automatically! Allow completion and flag for organizer review
+      participant.status = 'flagged';
+      participant.is_flagged = true;
     }
 
     const log: SecurityLog = {
@@ -974,6 +982,9 @@ class QuizRepository {
       participant_id: participantId,
       violation_type: violationType,
       warning_level: participant.warning_count,
+      duration_ms: durationMs,
+      question_index: questionIndex,
+      details: details || `Away for ${(durationMs / 1000).toFixed(1)}s`,
       recorded_at: new Date().toISOString(),
     };
 
@@ -989,9 +1000,7 @@ class QuizRepository {
             ? 'WARNING_1'
             : participant.status === 'warning_2'
             ? 'WARNING_2'
-            : participant.status === 'removed'
-            ? 'REMOVED'
-            : 'ACTIVE';
+            : 'FLAGGED';
 
         await supabase
           .from('participants')
@@ -1006,6 +1015,9 @@ class QuizRepository {
           participant_id: participantId,
           violation_type: violationType,
           warning_level: participant.warning_count,
+          duration_ms: durationMs,
+          question_index: questionIndex,
+          details: log.details,
         });
       } catch (e) {
         console.warn('Supabase violation logging warning:', e);
@@ -1015,8 +1027,114 @@ class QuizRepository {
     return {
       warning_count: participant.warning_count,
       status: participant.status,
-      is_removed: participant.status === 'removed',
+      is_removed: false,
+      is_flagged: participant.warning_count >= 3 || participant.status === 'flagged',
     };
+  }
+
+  // Retrieve security logs for a session or specific participant
+  public async getSecurityLogs(sessionId: string, participantId?: string): Promise<SecurityLog[]> {
+    let logs = this.securityLogs.get(sessionId) || [];
+    if (participantId) {
+      logs = logs.filter(l => l.participant_id === participantId);
+    }
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        let query = supabase
+          .from('security_logs')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('recorded_at', { ascending: true });
+
+        if (participantId) {
+          query = query.eq('participant_id', participantId);
+        }
+
+        const { data, error } = await query;
+        if (!error && data && data.length > 0) {
+          return data.map((d: any) => ({
+            id: d.id,
+            session_id: d.session_id,
+            participant_id: d.participant_id,
+            violation_type: d.violation_type,
+            warning_level: d.warning_level,
+            duration_ms: d.duration_ms || 0,
+            question_index: d.question_index || 0,
+            details: d.details || '',
+            recorded_at: d.recorded_at,
+          }));
+        }
+      } catch (e) {
+        console.warn('Supabase getSecurityLogs warning:', e);
+      }
+    }
+
+    return logs;
+  }
+
+  // Submit student appeal note
+  public async submitAppeal(code: string, participantId: string, appealNote: string): Promise<Participant> {
+    const session = await this.getSessionByCode(code);
+    if (!session) throw new Error('Session not found');
+
+    const participant = await this.getParticipantById(session.id, participantId);
+    if (!participant) throw new Error('Participant not found');
+
+    participant.appeal_note = appealNote.trim();
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase
+          .from('participants')
+          .update({ appeal_note: participant.appeal_note })
+          .eq('id', participantId);
+      } catch (e) {
+        console.warn('Supabase submitAppeal warning:', e);
+      }
+    }
+
+    return participant;
+  }
+
+  // Organizer manual audit action (Pardon / Disqualify)
+  public async auditAction(code: string, participantId: string, action: 'pardon' | 'disqualify'): Promise<Participant> {
+    const session = await this.getSessionByCode(code);
+    if (!session) throw new Error('Session not found');
+
+    const participant = await this.getParticipantById(session.id, participantId);
+    if (!participant) throw new Error('Participant not found');
+
+    if (action === 'pardon') {
+      participant.status = 'approved';
+      participant.is_flagged = false;
+      participant.resolved_by = 'Pardoned by Organizer';
+    } else if (action === 'disqualify') {
+      participant.status = 'removed';
+      participant.is_flagged = true;
+      participant.total_score = 0;
+      participant.resolved_by = 'Disqualified by Organizer';
+    }
+
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        await supabase
+          .from('participants')
+          .update({
+            status: action === 'pardon' ? 'APPROVED' : 'REMOVED',
+            total_score: participant.total_score,
+            resolved_by: participant.resolved_by,
+          })
+          .eq('id', participantId);
+      } catch (e) {
+        console.warn('Supabase auditAction warning:', e);
+      }
+    }
+
+    return participant;
   }
 
   // Retrieve all question IDs answered by a specific participant in this session

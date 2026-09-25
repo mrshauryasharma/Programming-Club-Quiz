@@ -48,8 +48,10 @@ CREATE TABLE IF NOT EXISTS session_participants (
   department TEXT NOT NULL,
   custom_department TEXT,
   email TEXT NOT NULL,
-  warning_count INT NOT NULL DEFAULT 0 CHECK (warning_count >= 0 AND warning_count <= 3),
-  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'warning_1', 'warning_2', 'removed')),
+  warning_count INT NOT NULL DEFAULT 0 CHECK (warning_count >= 0),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'warning_1', 'warning_2', 'flagged', 'approved', 'removed', 'completed')),
+  appeal_note TEXT,
+  resolved_by TEXT,
   total_score INT NOT NULL DEFAULT 0,
   total_response_time_ms BIGINT NOT NULL DEFAULT 0,
   joined_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
@@ -59,6 +61,12 @@ CREATE TABLE IF NOT EXISTS session_participants (
 -- Migration statement if updating existing table
 ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS year TEXT NOT NULL DEFAULT '1st Year';
 ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS custom_department TEXT;
+ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS appeal_note TEXT;
+ALTER TABLE session_participants ADD COLUMN IF NOT EXISTS resolved_by TEXT;
+ALTER TABLE session_participants DROP CONSTRAINT IF EXISTS session_participants_warning_count_check;
+ALTER TABLE session_participants ADD CONSTRAINT session_participants_warning_count_check CHECK (warning_count >= 0);
+ALTER TABLE session_participants DROP CONSTRAINT IF EXISTS session_participants_status_check;
+ALTER TABLE session_participants ADD CONSTRAINT session_participants_status_check CHECK (status IN ('active', 'warning_1', 'warning_2', 'flagged', 'approved', 'removed', 'completed'));
 
 -- 6. Session Answers Table
 CREATE TABLE IF NOT EXISTS session_answers (
@@ -81,8 +89,15 @@ CREATE TABLE IF NOT EXISTS security_logs (
   participant_id UUID REFERENCES session_participants(id) ON DELETE CASCADE NOT NULL,
   violation_type TEXT NOT NULL,
   warning_level INT NOT NULL,
+  duration_ms BIGINT NOT NULL DEFAULT 0,
+  question_index INT NOT NULL DEFAULT 0,
+  details TEXT,
   recorded_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+ALTER TABLE security_logs ADD COLUMN IF NOT EXISTS duration_ms BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE security_logs ADD COLUMN IF NOT EXISTS question_index INT NOT NULL DEFAULT 0;
+ALTER TABLE security_logs ADD COLUMN IF NOT EXISTS details TEXT;
 
 -- Indices for rapid querying
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_order ON questions(quiz_id, order_index);

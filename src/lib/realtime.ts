@@ -8,6 +8,9 @@ export type RealtimeEvent =
   | 'SHOW_LEADERBOARD'
   | 'FINAL_RESULTS'
   | 'PARTICIPANT_REMOVED'
+  | 'SECURITY_ALERT'
+  | 'STUDENT_APPEAL'
+  | 'PARTICIPANT_AUDIT_UPDATED'
   | 'TIMER_TICK';
 
 export interface BroadcastPayload {

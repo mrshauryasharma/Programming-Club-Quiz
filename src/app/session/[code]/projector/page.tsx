@@ -281,6 +281,11 @@ export default function ProjectorViewPage() {
                             <span className="font-extrabold text-sm sm:text-base text-brand-navy">
                               {p.name}
                             </span>
+                            {p.is_flagged && (
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-300">
+                                Under Review
+                              </span>
+                            )}
                             <span className="text-xs text-slate-500 font-medium">({p.department})</span>
                           </div>
 
@@ -488,6 +493,11 @@ export default function ProjectorViewPage() {
                         {p.rank}
                       </span>
                       <span className="text-slate-800">{p.name}</span>
+                      {p.is_flagged && (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-300">
+                          Under Review
+                        </span>
+                      )}
                       <span className="text-xs text-slate-500 font-normal">({p.department})</span>
                     </div>
 

@@ -45,6 +45,12 @@ export default function ParticipantPlayPage() {
   const [isRemoved, setIsRemoved] = useState(false);
   const [showWarningModal, setShowWarningModal] = useState<number | null>(null);
 
+  // Student Appeal / Reason state
+  const [showAppealModal, setShowAppealModal] = useState(false);
+  const [appealText, setAppealText] = useState('');
+  const [isSubmittingAppeal, setIsSubmittingAppeal] = useState(false);
+  const [appealSubmitted, setAppealSubmitted] = useState(false);
+
   // Network & System state
   const [isConnected, setIsConnected] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -65,6 +71,12 @@ export default function ParticipantPlayPage() {
   const lastViolationTimeRef = useRef<number>(0);
   const isWarningModalOpenRef = useRef<boolean>(false);
   const questionStartTimeRef = useRef<number>(Date.now());
+  const awayStartTimeRef = useRef<number | null>(null);
+  const currentQuestionIndexRef = useRef<number>(0);
+
+  useEffect(() => {
+    currentQuestionIndexRef.current = myQuestionIndex;
+  }, [myQuestionIndex]);
 
   useEffect(() => {
     isWarningModalOpenRef.current = showWarningModal !== null;
@@ -83,16 +95,18 @@ export default function ParticipantPlayPage() {
     router.push('/');
   };
 
-  // Anti-cheat violation reporter
+  // Anti-cheat violation reporter with duration and question index
   const reportViolation = useCallback(
-    async (type: string) => {
+    async (type: string, durationMs: number = 0, qIndex?: number, details?: string) => {
       // Ignore if disconnected, already removed, or warning modal is currently open waiting for user acknowledgement
       if (!navigator.onLine || isRemoved || !participantId || isWarningModalOpenRef.current) return;
 
-      // Throttle/debounce within 3000ms so a single tab switch does not fire both blur and visibilitychange
       const now = Date.now();
-      if (now - lastViolationTimeRef.current < 3000) return;
+      // Throttle within 2000ms so multiple blur and visibility events don't double fire
+      if (now - lastViolationTimeRef.current < 2000) return;
       lastViolationTimeRef.current = now;
+
+      const effectiveQIndex = qIndex ?? (currentQuestionIndexRef.current + 1);
 
       try {
         const res = await fetch(`/api/sessions/${code}/violation`, {
@@ -101,6 +115,9 @@ export default function ParticipantPlayPage() {
           body: JSON.stringify({
             participant_id: participantId,
             violation_type: type,
+            duration_ms: durationMs,
+            question_index: effectiveQIndex,
+            details: details || `Away for ${(durationMs / 1000).toFixed(1)}s on Question ${effectiveQIndex}`,
           }),
         });
         const data = await res.json();
@@ -118,6 +135,31 @@ export default function ParticipantPlayPage() {
     },
     [code, participantId, isRemoved]
   );
+
+  // Submit student appeal note
+  const handleSubmitAppeal = async () => {
+    if (!participantId || !appealText.trim() || isSubmittingAppeal) return;
+    setIsSubmittingAppeal(true);
+    try {
+      const res = await fetch(`/api/sessions/${code}/appeal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participant_id: participantId,
+          appeal_note: appealText.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setAppealSubmitted(true);
+        setShowAppealModal(false);
+      }
+    } catch (e) {
+      console.warn('Error submitting appeal note:', e);
+    } finally {
+      setIsSubmittingAppeal(false);
+    }
+  };
 
   // Initial setup & event listeners
   useEffect(() => {
@@ -139,21 +181,52 @@ export default function ParticipantPlayPage() {
     setParticipantId(storedId);
     setParticipantName(storedName || 'Participant');
 
-    // Anti-cheat listeners
+    // Anti-cheat listeners with precise duration tracking
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        reportViolation('tab_hidden_or_switched');
+        awayStartTimeRef.current = Date.now();
+      } else if (document.visibilityState === 'visible') {
+        const duration = awayStartTimeRef.current ? Date.now() - awayStartTimeRef.current : 0;
+        awayStartTimeRef.current = null;
+        reportViolation('tab_hidden_or_switched', duration, currentQuestionIndexRef.current + 1);
       }
     };
 
     const handleWindowBlur = () => {
-      reportViolation('window_blur_or_focus_lost');
+      if (!awayStartTimeRef.current) {
+        awayStartTimeRef.current = Date.now();
+      }
+    };
+
+    const handleWindowFocus = () => {
+      if (awayStartTimeRef.current) {
+        const duration = Date.now() - awayStartTimeRef.current;
+        awayStartTimeRef.current = null;
+        reportViolation('window_blur_or_focus_lost', duration, currentQuestionIndexRef.current + 1);
+      }
+    };
+
+    // Split-screen window resize detection
+    const handleResize = () => {
+      if (typeof window !== 'undefined' && window.screen.availWidth > 768) {
+        if (window.innerWidth < window.screen.availWidth * 0.58) {
+          reportViolation('split_screen_detected', 0, currentQuestionIndexRef.current + 1, 'Split-screen resize detected');
+        }
+      }
+    };
+
+    // Copy / Cut / Context menu prevention
+    const handleCopy = (e: ClipboardEvent) => {
+      e.preventDefault();
+    };
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
     };
 
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
       if (!document.fullscreenElement) {
-        reportViolation('fullscreen_exited');
+        reportViolation('fullscreen_exited', 0, currentQuestionIndexRef.current + 1);
       }
     };
 
@@ -178,6 +251,11 @@ export default function ParticipantPlayPage() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('resize', handleResize);
+    document.addEventListener('copy', handleCopy);
+    document.addEventListener('cut', handleCopy);
+    document.addEventListener('contextmenu', handleContextMenu);
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -189,6 +267,10 @@ export default function ParticipantPlayPage() {
         if (data.participant) {
           setWarningCount(data.participant.warning_count);
           if (data.participant.status === 'removed') setIsRemoved(true);
+          if (data.participant.appeal_note) {
+            setAppealText(data.participant.appeal_note);
+            setAppealSubmitted(true);
+          }
         } else {
           // Stored participant is not in this session; clean storage and redirect to join
           if (typeof window !== 'undefined') {
@@ -204,6 +286,11 @@ export default function ParticipantPlayPage() {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
+      window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('resize', handleResize);
+      document.removeEventListener('copy', handleCopy);
+      document.removeEventListener('cut', handleCopy);
+      document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
@@ -567,36 +654,104 @@ export default function ParticipantPlayPage() {
         </div>
       </header>
 
-      {/* Anti-Cheat Warning Modal (Warning 1 & 2) */}
+      {/* Anti-Cheat Warning Modal (Warning 1, 2, and 3+ Flagged) */}
       {showWarningModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
           <div className="w-full max-w-sm p-6 rounded-2xl bg-white border border-amber-300 text-center shadow-2xl animate-in zoom-in-95">
             <div className="w-12 h-12 mx-auto rounded-full bg-amber-50 flex items-center justify-center text-amber-600 mb-3 border border-amber-200">
               <AlertTriangle className="w-6 h-6" />
             </div>
             <h3 className="text-lg font-bold text-amber-700 uppercase tracking-tight">
-              Anti-Cheat Warning {showWarningModal} of 3
+              {showWarningModal >= 3 ? 'Security Alert: Flagged for Review' : `Anti-Cheat Warning ${showWarningModal} of 3`}
             </h3>
             <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-              You navigated away from the quiz window or switched tabs.
-              {showWarningModal === 1 && ' This is your 1st warning. Please remain on this screen.'}
-              {showWarningModal === 2 && ' CAUTION: A 3rd violation will cause IMMEDIATE REMOVAL.'}
+              {showWarningModal >= 3 ? (
+                <>
+                  You had 3 or more security alerts. Your quiz is now <strong>flagged for Organizer Review</strong>. You may continue and complete all questions. Your final result will be reviewed by the Organizer.
+                </>
+              ) : (
+                <>
+                  You navigated away from the quiz window or switched tabs.
+                  {showWarningModal === 1 && ' This is your 1st warning. Please remain on this screen.'}
+                  {showWarningModal === 2 && ' CAUTION: A 3rd violation will flag your quiz for Organizer Review.'}
+                </>
+              )}
             </p>
             <button
               onClick={() => {
                 setShowWarningModal(null);
                 lastViolationTimeRef.current = Date.now();
               }}
-              className="mt-5 w-full py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer active:scale-95"
+              className="mt-5 w-full py-2.5 rounded-xl font-bold text-xs bg-amber-500 hover:bg-amber-600 text-white transition-colors cursor-pointer active:scale-95 shadow-md"
             >
-              I Understand & Remain Focused
+              {showWarningModal >= 3 ? 'I Understand & Continue Quiz' : 'I Understand & Remain Focused'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Student Appeal / Reason Modal */}
+      {showAppealModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-md p-6 rounded-2xl bg-white border border-slate-200 text-left shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 border border-amber-200">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">Explain Reason to Organizer</h3>
+                <p className="text-[11px] text-slate-500">Provide a technical reason for your screen alerts</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+              If an accidental phone call, low battery notification, or device glitch caused a screen blur, enter it here. The Organizer can review and pardon your standing.
+            </p>
+            <textarea
+              value={appealText}
+              onChange={(e) => setAppealText(e.target.value)}
+              placeholder="e.g., Phone call popped up, low battery dialog appeared, accidental trackpad swipe..."
+              rows={3}
+              className="w-full p-3 rounded-xl border border-slate-300 bg-slate-50 text-xs text-slate-900 focus:bg-white focus:outline-none focus:border-brand-purple focus:ring-2 focus:ring-brand-purple/20 transition-all resize-none"
+            />
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setShowAppealModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitAppeal}
+                disabled={!appealText.trim() || isSubmittingAppeal}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-md disabled:opacity-50 transition-all cursor-pointer"
+              >
+                {isSubmittingAppeal ? 'Submitting...' : 'Submit to Organizer'}
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Dynamic State View Container */}
       <div className="w-full max-w-2xl mx-auto my-auto py-4">
+
+        {/* Persistent Flagged Review Alert Banner */}
+        {warningCount >= 3 && !showCompletionScreen && (
+          <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-300 text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm text-xs animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              <span>
+                <strong>Quiz Under Organizer Review:</strong> You can finish the quiz. If you had a technical reason, submit your note.
+              </span>
+            </div>
+            <button
+              onClick={() => setShowAppealModal(true)}
+              className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg transition-colors cursor-pointer text-[11px] whitespace-nowrap self-start sm:self-auto shadow-sm"
+            >
+              {appealSubmitted ? '✓ Reason Submitted' : 'Submit Reason / Note'}
+            </button>
+          </div>
+        )}
 
         {/* -------------------------------------------------------- */}
         {/* COMPLETION SCREEN — shown immediately after final question submit */}
@@ -616,6 +771,45 @@ export default function ParticipantPlayPage() {
             <div className="mt-4 p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600">
               Winners and top performers will be announced directly by the Organizer.
             </div>
+
+            {/* Flagged Student Review & Reason Section on Completion Screen */}
+            {warningCount >= 3 && (
+              <div className="mt-5 p-4 rounded-xl bg-amber-50 border border-amber-200 text-left text-xs text-amber-900">
+                <div className="flex items-center gap-2 font-bold mb-1">
+                  <AlertTriangle className="w-4 h-4 text-amber-600" />
+                  <span>Submission Flagged for Review</span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  Your quiz recorded {warningCount} security alerts. Your rank is awaiting Organizer review.
+                </p>
+                {!appealSubmitted ? (
+                  <div className="mt-3">
+                    <p className="text-[11px] font-semibold text-slate-700 mb-1">Have an explanation for the Organizer?</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={appealText}
+                        onChange={(e) => setAppealText(e.target.value)}
+                        placeholder="e.g. Phone call, battery dialog, accidental swipe"
+                        className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-slate-300 bg-white focus:outline-none focus:border-brand-purple"
+                      />
+                      <button
+                        onClick={handleSubmitAppeal}
+                        disabled={!appealText.trim() || isSubmittingAppeal}
+                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg shadow-sm disabled:opacity-50 transition-all cursor-pointer"
+                      >
+                        {isSubmittingAppeal ? 'Sending...' : 'Send'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-[11px] text-emerald-700 font-semibold">
+                    ✓ Your note was sent to the Organizer: &ldquo;{appealText}&rdquo;
+                  </p>
+                )}
+              </div>
+            )}
+
             <button
               onClick={handleExitQuiz}
               className="mt-6 px-6 py-2.5 rounded-xl bg-brand-purple hover:bg-[#6A1694] text-white font-bold text-xs shadow-md transition-all active:scale-95 cursor-pointer inline-flex items-center gap-2"
@@ -652,7 +846,7 @@ export default function ParticipantPlayPage() {
             const totalQ = questionsList.length || activeQuestion?.total_questions || 5;
 
             return (
-              <div className="space-y-4">
+              <div className="space-y-4 select-none">
                 {/* Visual Progress Bar (Step Indicator) */}
                 <div className="flex items-center gap-1.5 w-full px-1">
                   {Array.from({ length: totalQ }).map((_, i) => (

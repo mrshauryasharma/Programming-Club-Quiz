@@ -8,7 +8,7 @@ export type SessionState =
 
 export type SessionStatus = 'waiting' | 'active' | 'completed';
 
-export type ParticipantStatus = 'active' | 'warning_1' | 'warning_2' | 'removed' | 'completed';
+export type ParticipantStatus = 'active' | 'warning_1' | 'warning_2' | 'flagged' | 'approved' | 'removed' | 'completed';
 
 export interface Question {
   id: string;
@@ -60,12 +60,15 @@ export interface Participant {
   department: string;
   custom_department?: string;
   email: string;
-  warning_count: number; // 0..3
+  warning_count: number; // 0..3+
   status: ParticipantStatus;
   total_score: number; // sum of points (+2 per correct)
   total_response_time_ms: number; // sum of response times in ms
   joined_at: string;
   rank?: number;
+  appeal_note?: string;
+  is_flagged?: boolean;
+  resolved_by?: string;
 }
 
 export interface Answer {
@@ -86,6 +89,9 @@ export interface SecurityLog {
   participant_id: string;
   violation_type: string;
   warning_level: number;
+  duration_ms?: number;
+  question_index?: number;
+  details?: string;
   recorded_at: string;
 }
 

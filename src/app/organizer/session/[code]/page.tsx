@@ -20,6 +20,11 @@ import {
   BarChart3,
   Sparkles,
   ArrowLeft,
+  ShieldAlert,
+  Search,
+  X,
+  ShieldCheck,
+  MessageSquare,
 } from 'lucide-react';
 
 export default function OrganizerLiveSessionPage() {
@@ -30,6 +35,13 @@ export default function OrganizerLiveSessionPage() {
   const [sessionData, setSessionData] = useState<any>(null);
   const [loadingAction, setLoadingAction] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
+
+  // Anti-Cheat Audit & Inspector state
+  const [liveToast, setLiveToast] = useState<{ message: string; participantId: string; type: string } | null>(null);
+  const [inspectingParticipant, setInspectingParticipant] = useState<any | null>(null);
+  const [participantLogs, setParticipantLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [actionProcessing, setActionProcessing] = useState(false);
 
   const fetchSessionState = useCallback(async () => {
     try {
@@ -58,6 +70,29 @@ export default function OrganizerLiveSessionPage() {
         .on('broadcast', { event: 'SHOW_LEADERBOARD' }, () => fetchSessionState())
         .on('broadcast', { event: 'FINAL_RESULTS' }, () => fetchSessionState())
         .on('broadcast', { event: 'PARTICIPANT_REMOVED' }, () => fetchSessionState())
+        .on('broadcast', { event: 'PARTICIPANT_AUDIT_UPDATED' }, () => fetchSessionState())
+        .on('broadcast', { event: 'SECURITY_ALERT' }, (payload: any) => {
+          const info = payload.payload;
+          if (info) {
+            setLiveToast({
+              message: `${info.is_flagged ? '🚨 FLAGGED:' : '⚠️ Alert:'} Q${info.question_index || 1} — ${(info.duration_ms / 1000).toFixed(1)}s away`,
+              participantId: info.participant_id,
+              type: info.is_flagged ? 'flagged' : 'warning',
+            });
+          }
+          fetchSessionState();
+        })
+        .on('broadcast', { event: 'STUDENT_APPEAL' }, (payload: any) => {
+          const info = payload.payload;
+          if (info) {
+            setLiveToast({
+              message: `📝 Note from ${info.name}: "${info.appeal_note}"`,
+              participantId: info.participant_id,
+              type: 'appeal',
+            });
+          }
+          fetchSessionState();
+        })
         .subscribe();
     }
 
@@ -106,6 +141,57 @@ export default function OrganizerLiveSessionPage() {
     }
   };
 
+  // Auto-dismiss live alert toast after 7s
+  useEffect(() => {
+    if (liveToast) {
+      const timer = setTimeout(() => setLiveToast(null), 7000);
+      return () => clearTimeout(timer);
+    }
+  }, [liveToast]);
+
+  const handleOpenInspector = async (participant: any) => {
+    setInspectingParticipant(participant);
+    setLoadingLogs(true);
+    try {
+      const res = await fetch(`/api/sessions/${code}/audit-action?participant_id=${participant.id}`);
+      const data = await res.json();
+      if (data.success) {
+        setParticipantLogs(data.logs || []);
+        if (data.participant) setInspectingParticipant(data.participant);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch participant logs:', err);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
+  const handleAuditDecision = async (action: 'pardon' | 'disqualify') => {
+    if (!inspectingParticipant) return;
+    setActionProcessing(true);
+    try {
+      const res = await fetch(`/api/sessions/${code}/audit-action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participant_id: inspectingParticipant.id,
+          action,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchSessionState();
+        setInspectingParticipant(null);
+      } else {
+        alert(data.error || 'Failed to update participant status');
+      }
+    } catch (err) {
+      alert('Error updating audit action');
+    } finally {
+      setActionProcessing(false);
+    }
+  };
+
   const formatElapsed = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
@@ -120,7 +206,184 @@ export default function OrganizerLiveSessionPage() {
   const participants = sessionData?.participants || [];
 
   return (
-    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246] transition-colors">
+    <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246] transition-colors relative">
+      {/* Realtime Live Alert Toast */}
+      {liveToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm p-4 rounded-2xl bg-white border border-rose-300 shadow-2xl flex items-start gap-3 animate-in slide-in-from-bottom-5">
+          <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center border border-rose-200 flex-shrink-0 mt-0.5">
+            <ShieldAlert className="w-4 h-4" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-xs font-bold text-slate-900">Security Alert Detected</h4>
+            <p className="text-xs text-slate-600 mt-0.5 leading-tight">{liveToast.message}</p>
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const targetP = (leaderboard.length > 0 ? leaderboard : participants).find((x: any) => x.id === liveToast.participantId);
+                  if (targetP) handleOpenInspector(targetP);
+                  setLiveToast(null);
+                }}
+                className="text-[11px] font-bold text-brand-purple hover:underline cursor-pointer"
+              >
+                Inspect Student &rarr;
+              </button>
+              <button
+                onClick={() => setLiveToast(null)}
+                className="text-[11px] text-slate-400 hover:text-slate-600 cursor-pointer ml-auto"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Security Audit & Inspector Modal */}
+      {inspectingParticipant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-lg p-6 rounded-3xl bg-white border border-slate-200 shadow-2xl text-left animate-in zoom-in-95 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 font-black">
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-900">{inspectingParticipant.name}</h3>
+                  <p className="text-[11px] font-mono text-slate-500">
+                    Roll: {inspectingParticipant.roll_no} &bull; {inspectingParticipant.department}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setInspectingParticipant(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body: Scrollable */}
+            <div className="py-4 overflow-y-auto flex-1 space-y-4 pr-1">
+              {/* Score & Warning Summary Card */}
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-semibold block uppercase">Total Score</span>
+                  <span className="text-base font-black text-brand-purple">{inspectingParticipant.total_score ?? inspectingParticipant.score ?? 0} pts</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-semibold block uppercase">Warnings</span>
+                  <span className="text-base font-black text-amber-600">{inspectingParticipant.warning_count || 0}</span>
+                </div>
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-[10px] text-slate-500 font-semibold block uppercase">Audit Status</span>
+                  <span className="text-xs font-black capitalize text-slate-800">{inspectingParticipant.status || 'Active'}</span>
+                </div>
+              </div>
+
+              {/* Student Appeal Note if available */}
+              {inspectingParticipant.appeal_note ? (
+                <div className="p-3.5 rounded-xl bg-purple-50 border border-purple-200 text-xs text-purple-900">
+                  <div className="flex items-center gap-1.5 font-bold mb-1 text-brand-purple">
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Student&apos;s Submitted Explanation:</span>
+                  </div>
+                  <p className="italic bg-white/70 p-2 rounded-lg border border-purple-100 mt-1">
+                    &ldquo;{inspectingParticipant.appeal_note}&rdquo;
+                  </p>
+                </div>
+              ) : (
+                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-500 text-center italic">
+                  No explanation note submitted by student.
+                </div>
+              )}
+
+              {/* Timeline of Events */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Violation Timeline &amp; Telemetry
+                </h4>
+                {loadingLogs ? (
+                  <div className="text-center py-6 text-xs text-slate-500">Loading security logs...</div>
+                ) : participantLogs.length === 0 ? (
+                  <div className="text-center py-6 rounded-xl bg-slate-50 border border-slate-200 text-xs text-emerald-700 font-medium">
+                    &check; Clean record! No security violations recorded for this participant.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {participantLogs.map((log: any, index: number) => {
+                      const durSec = (log.duration_ms / 1000).toFixed(1);
+                      const isAccidental = (log.duration_ms || 0) < 2000;
+                      const isSuspicious = (log.duration_ms || 0) >= 2000 && (log.duration_ms || 0) <= 7000;
+
+                      return (
+                        <div
+                          key={log.id || index}
+                          className="p-3 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition-colors text-xs flex items-center justify-between gap-3 shadow-xs"
+                        >
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900 capitalize">
+                                {log.violation_type?.replace(/_/g, ' ') || 'Screen Blur'}
+                              </span>
+                              <span className="text-[10px] font-mono text-slate-500">
+                                {new Date(log.recorded_at).toLocaleTimeString()}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5">
+                              Question {log.question_index || '?'} &bull; Away for {durSec}s
+                            </p>
+                          </div>
+                          <div>
+                            {isAccidental ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Accidental (&lt;2s)
+                              </span>
+                            ) : isSuspicious ? (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                Suspicious (2-7s)
+                              </span>
+                            ) : (
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                High Risk (&gt;7s)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="pt-4 border-t border-slate-200 flex items-center justify-between gap-2">
+              <span className="text-[11px] text-slate-500">
+                Organizer Decision:
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleAuditDecision('pardon')}
+                  disabled={actionProcessing}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Approve &amp; Pardon</span>
+                </button>
+                <button
+                  onClick={() => handleAuditDecision('disqualify')}
+                  disabled={actionProcessing}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-sm transition-all cursor-pointer disabled:opacity-50 inline-flex items-center gap-1.5"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Disqualify</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Header */}
       <header className="max-w-6xl mx-auto flex items-center justify-between pb-6 border-b border-slate-200">
         <div className="flex items-center gap-3">
@@ -467,13 +730,16 @@ export default function OrganizerLiveSessionPage() {
                     <th className="py-3 px-3 text-center">Score</th>
                     <th className="py-3 px-3 text-center">Total Time</th>
                     <th className="py-3 px-3 text-center">Anti-Cheat Status</th>
+                    <th className="py-3 px-3 text-center w-20">Review</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 font-medium">
                   {(leaderboard.length > 0 ? leaderboard : participants).map((p: any, idx: number) => {
                     const isRemoved = p.status === 'removed';
-                    const isWarn2 = p.status === 'warning_2';
-                    const isWarn1 = p.status === 'warning_1';
+                    const isApproved = p.status === 'approved';
+                    const isFlagged = p.status === 'flagged' || p.is_flagged || ((p.warning_count || 0) >= 3 && p.status !== 'approved');
+                    const isWarn2 = p.status === 'warning_2' || p.warning_count === 2;
+                    const isWarn1 = p.status === 'warning_1' || p.warning_count === 1;
                     const rank = p.rank || idx + 1;
 
                     return (
@@ -495,7 +761,16 @@ export default function OrganizerLiveSessionPage() {
                             <span className="text-slate-500 font-mono font-bold">#{rank}</span>
                           )}
                         </td>
-                        <td className="py-3 px-3 font-bold text-slate-900">{p.name}</td>
+                        <td className="py-3 px-3 font-bold text-slate-900">
+                          <div>
+                            <span>{p.name}</span>
+                            {p.appeal_note && (
+                              <span className="block text-[10px] text-brand-purple font-normal italic truncate max-w-[180px]">
+                                &ldquo;{p.appeal_note}&rdquo;
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-3 px-3 font-mono text-slate-600">{p.roll_no}</td>
                         <td className="py-3 px-3 text-slate-600">{p.department}</td>
                         <td className="py-3 px-3 text-center font-black text-brand-purple text-sm">
@@ -507,8 +782,20 @@ export default function OrganizerLiveSessionPage() {
                         <td className="py-3 px-3 text-center">
                           {isRemoved ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <Ban className="w-3 h-3" /> REMOVED (3 Strikes)
+                              <Ban className="w-3 h-3" /> Disqualified
                             </span>
+                          ) : isApproved ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                              <ShieldCheck className="w-3 h-3" /> Pardoned / Clean
+                            </span>
+                          ) : isFlagged ? (
+                            <button
+                              onClick={() => handleOpenInspector(p)}
+                              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-300 animate-pulse hover:bg-rose-100 cursor-pointer shadow-xs"
+                              title="Click to inspect security logs"
+                            >
+                              <ShieldAlert className="w-3 h-3 text-rose-600" /> Flagged ({p.warning_count || 3} Strikes)
+                            </button>
                           ) : isWarn2 ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               <AlertTriangle className="w-3 h-3" /> Warning 2/3
@@ -519,9 +806,19 @@ export default function OrganizerLiveSessionPage() {
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              <CheckCircle2 className="w-3 h-3" /> Active & Clean
+                              <CheckCircle2 className="w-3 h-3" /> Clean
                             </span>
                           )}
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            onClick={() => handleOpenInspector(p)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-brand-purple hover:text-white text-slate-700 text-[11px] font-bold transition-all border border-slate-200 cursor-pointer inline-flex items-center gap-1 shadow-xs"
+                            title="Inspect student security history"
+                          >
+                            <Search className="w-3 h-3" />
+                            <span>Logs</span>
+                          </button>
                         </td>
                       </tr>
                     );
