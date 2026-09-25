@@ -26,11 +26,13 @@ import {
   ShieldCheck,
   MessageSquare,
 } from 'lucide-react';
+import { useOrganizerAuth } from '@/lib/useOrganizerAuth';
 
 export default function OrganizerLiveSessionPage() {
   const params = useParams();
   const router = useRouter();
   const code = (params.code as string)?.toUpperCase();
+  const { isAuthenticated } = useOrganizerAuth();
 
   const [sessionData, setSessionData] = useState<any>(null);
   const [loadingAction, setLoadingAction] = useState(false);
@@ -55,6 +57,7 @@ export default function OrganizerLiveSessionPage() {
   }, [code]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchSessionState();
     const interval = setInterval(fetchSessionState, 2000);
 
@@ -105,7 +108,7 @@ export default function OrganizerLiveSessionPage() {
       if (channel && supabase) supabase.removeChannel(channel);
       eventSource.close();
     };
-  }, [code, fetchSessionState]);
+  }, [code, fetchSessionState, isAuthenticated]);
 
   // Stopwatch for active live quiz duration
   useEffect(() => {
@@ -204,6 +207,23 @@ export default function OrganizerLiveSessionPage() {
   const completedCount = sessionData?.progress?.completed || 0;
   const leaderboard = sessionData?.leaderboard || [];
   const participants = sessionData?.participants || [];
+
+  if (isAuthenticated === null || !sessionData) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-brand-purple/20 border-t-brand-purple rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-500">
+            {isAuthenticated === null ? 'Verifying organizer session...' : 'Loading session data...'}
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isAuthenticated === false) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246] transition-colors relative">

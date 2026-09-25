@@ -16,15 +16,18 @@ import {
   AlertCircle,
   Award,
 } from 'lucide-react';
+import { useOrganizerAuth } from '@/lib/useOrganizerAuth';
 
 export default function QuizHistoryAnalyticsPage() {
   const params = useParams();
   const code = (params.code as string)?.toUpperCase();
+  const { isAuthenticated } = useOrganizerAuth();
 
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetch(`/api/sessions/${code}/analytics`)
       .then((res) => res.json())
       .then((data) => {
@@ -32,14 +35,21 @@ export default function QuizHistoryAnalyticsPage() {
       })
       .catch((err) => console.error(err))
       .finally(() => setLoading(false));
-  }, [code]);
+  }, [code, isAuthenticated]);
 
-  if (loading) {
+  if (isAuthenticated === null || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9]">
-        <div className="w-8 h-8 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-500">Verifying organizer session...</p>
+        </div>
       </div>
     );
+  }
+
+  if (isAuthenticated === false) {
+    return null;
   }
 
   if (!analytics) {

@@ -19,8 +19,11 @@ import {
   Edit3,
 } from 'lucide-react';
 
+import { useOrganizerAuth } from '@/lib/useOrganizerAuth';
+
 export default function OrganizerDashboardPage() {
   const router = useRouter();
+  const { isAuthenticated } = useOrganizerAuth();
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [startingSessionId, setStartingSessionId] = useState<string | null>(null);
@@ -39,8 +42,10 @@ export default function OrganizerDashboardPage() {
   };
 
   useEffect(() => {
-    fetchQuizzes();
-  }, []);
+    if (isAuthenticated) {
+      fetchQuizzes();
+    }
+  }, [isAuthenticated]);
 
   const handleStartLiveQuiz = async (quizId: string) => {
     setStartingSessionId(quizId);
@@ -77,6 +82,21 @@ export default function OrganizerDashboardPage() {
     await fetch('/api/organizer/auth', { method: 'DELETE' });
     router.push('/organizer/login');
   };
+
+  if (isAuthenticated === null) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-brand-purple/20 border-t-brand-purple rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-500">Verifying organizer session...</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (isAuthenticated === false) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">

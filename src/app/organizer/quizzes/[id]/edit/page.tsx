@@ -20,6 +20,7 @@ import {
   Edit3,
 } from 'lucide-react';
 import { parseMCQsFromText, extractTextFromPdfArrayBuffer } from '@/lib/pdfParser';
+import { useOrganizerAuth } from '@/lib/useOrganizerAuth';
 
 interface QuestionForm {
   question_text: string;
@@ -32,6 +33,7 @@ export default function EditQuizPage({ params }: { params: Promise<{ id: string 
   const resolvedParams = use(params);
   const quizId = resolvedParams.id;
   const router = useRouter();
+  const { isAuthenticated } = useOrganizerAuth();
 
   const [initialLoading, setInitialLoading] = useState(true);
   const [title, setTitle] = useState('');
@@ -56,6 +58,7 @@ export default function EditQuizPage({ params }: { params: Promise<{ id: string 
 
   // Load existing quiz data
   useEffect(() => {
+    if (!isAuthenticated) return;
     async function loadQuiz() {
       try {
         setInitialLoading(true);
@@ -272,13 +275,19 @@ export default function EditQuizPage({ params }: { params: Promise<{ id: string 
 
   const timerPresets = [10, 15, 20, 30, 45, 60, 90, 120];
 
-  if (initialLoading) {
+  if (isAuthenticated === null || initialLoading) {
     return (
       <main className="min-h-screen p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246] flex flex-col items-center justify-center">
         <div className="w-10 h-10 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin mb-4" />
-        <p className="text-sm font-bold text-slate-500">Loading quiz questions...</p>
+        <p className="text-sm font-bold text-slate-500">
+          {isAuthenticated === null ? 'Verifying organizer session...' : 'Loading quiz questions...'}
+        </p>
       </main>
     );
+  }
+
+  if (isAuthenticated === false) {
+    return null;
   }
 
   return (

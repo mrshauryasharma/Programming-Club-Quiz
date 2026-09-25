@@ -29,7 +29,9 @@ export default function OrganizerLoginPage() {
         throw new Error(data.error || 'Authentication failed');
       }
 
-      router.push('/organizer/dashboard');
+      const searchParams = new URLSearchParams(window.location.search);
+      const destination = searchParams.get('from') || '/organizer/dashboard';
+      router.push(destination);
     } catch (err: any) {
       setError(err.message || 'Invalid password');
     } finally {
