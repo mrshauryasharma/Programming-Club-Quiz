@@ -15,6 +15,8 @@ import {
   CheckCircle2,
   Award,
   Sparkles,
+  Lock,
+  ShieldAlert,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -304,27 +306,24 @@ export default function ProjectorViewPage() {
                 )}
               </div>
 
-              {/* Join QR Card for Late Arrivals */}
-              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xl text-center space-y-3">
-                <span className="text-[11px] uppercase tracking-wider font-extrabold text-brand-purple block">
-                  Join Active Quiz
-                </span>
-                <div className="p-3 bg-white rounded-2xl border-2 border-brand-purple inline-block shadow-md">
-                  {qrCodeDataUrl ? (
-                    <img src={qrCodeDataUrl} alt="Join QR Code" className="w-44 h-44 mx-auto" />
-                  ) : (
-                    <div className="w-44 h-44 flex items-center justify-center text-slate-400 text-xs">
-                      Loading QR...
-                    </div>
-                  )}
+              {/* Session Security & Room Status Card (Entries Locked) */}
+              <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-xl text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center mx-auto shadow-sm">
+                  <Lock className="w-7 h-7" />
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block uppercase font-bold">Game Code</span>
-                  <span className="text-2xl font-mono font-black tracking-widest text-brand-purple">{code}</span>
+                  <span className="text-[11px] uppercase tracking-wider font-extrabold text-amber-700 block">
+                    Session In Progress
+                  </span>
+                  <h4 className="text-xl font-black text-brand-navy mt-1">Lobby Entries Locked</h4>
                 </div>
-                <p className="text-[11px] text-slate-500 leading-tight">
-                  Late participants can scan and begin from Question 1.
+                <p className="p-3 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 font-medium leading-relaxed">
+                  The quiz is currently live. New participants cannot join mid-session to ensure anti-cheat compliance and leaderboard integrity.
                 </p>
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between px-2">
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Session Code</span>
+                  <span className="text-xl font-mono font-black tracking-widest text-brand-purple">{code}</span>
+                </div>
               </div>
             </div>
           </div>

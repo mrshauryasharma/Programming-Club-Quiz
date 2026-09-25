@@ -305,9 +305,16 @@ export default function OrganizerLiveSessionPage() {
                 {loadingLogs ? (
                   <div className="text-center py-6 text-xs text-slate-500">Loading security logs...</div>
                 ) : participantLogs.length === 0 ? (
-                  <div className="text-center py-6 rounded-xl bg-slate-50 border border-slate-200 text-xs text-emerald-700 font-medium">
-                    &check; Clean record! No security violations recorded for this participant.
-                  </div>
+                  inspectingParticipant.warning_count > 0 ? (
+                    <div className="text-center py-6 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800 font-medium space-y-1">
+                      <div className="font-bold text-amber-900">⚠️ {inspectingParticipant.warning_count} Security Warning(s) Registered</div>
+                      <p className="text-[11px] text-amber-700">Tab switch, app minimize, or screen blur detected during active quiz session.</p>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 rounded-xl bg-slate-50 border border-slate-200 text-xs text-emerald-700 font-medium">
+                      ✓ Clean record! No security violations recorded for this participant.
+                    </div>
+                  )
                 ) : (
                   <div className="space-y-2">
                     {participantLogs.map((log: any, index: number) => {

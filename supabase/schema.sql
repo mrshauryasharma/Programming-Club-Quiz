@@ -82,11 +82,11 @@ CREATE TABLE IF NOT EXISTS session_answers (
   CONSTRAINT unique_participant_question_answer UNIQUE (session_id, participant_id, question_id)
 );
 
--- 7. Security Logs Table
+-- 7. Security Logs Table (Anti-Cheat Telemetry)
 CREATE TABLE IF NOT EXISTS security_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  session_id UUID REFERENCES sessions(id) ON DELETE CASCADE NOT NULL,
-  participant_id UUID REFERENCES session_participants(id) ON DELETE CASCADE NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  session_id UUID NOT NULL,
+  participant_id UUID NOT NULL,
   violation_type TEXT NOT NULL,
   warning_level INT NOT NULL,
   duration_ms BIGINT NOT NULL DEFAULT 0,
@@ -98,6 +98,8 @@ CREATE TABLE IF NOT EXISTS security_logs (
 ALTER TABLE security_logs ADD COLUMN IF NOT EXISTS duration_ms BIGINT NOT NULL DEFAULT 0;
 ALTER TABLE security_logs ADD COLUMN IF NOT EXISTS question_index INT NOT NULL DEFAULT 0;
 ALTER TABLE security_logs ADD COLUMN IF NOT EXISTS details TEXT;
+CREATE INDEX IF NOT EXISTS idx_security_logs_session ON security_logs(session_id);
+CREATE INDEX IF NOT EXISTS idx_security_logs_participant ON security_logs(participant_id);
 
 -- Indices for rapid querying
 CREATE INDEX IF NOT EXISTS idx_questions_quiz_order ON questions(quiz_id, order_index);

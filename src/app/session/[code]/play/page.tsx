@@ -7,8 +7,8 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { getSupabaseBrowserClient } from '@/lib/supabase';
 import {
   WifiOff,
-  Maximize2,
-  Minimize2,
+  ShieldAlert,
+  Lock,
   AlertTriangle,
   Ban,
   CheckCircle2,
@@ -57,14 +57,19 @@ export default function ParticipantPlayPage() {
   const [timerRemainingSec, setTimerRemainingSec] = useState<number>(30);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fullscreen helper
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen().catch(() => {});
-      setIsFullscreen(false);
+  // Mandatory Fullscreen helper
+  const enterFullscreen = () => {
+    if (typeof document !== 'undefined') {
+      const el = document.documentElement as any;
+      const requestMethod =
+        el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+      if (requestMethod) {
+        requestMethod.call(el).then(() => {
+          setIsFullscreen(true);
+        }).catch((err: any) => {
+          console.warn('Fullscreen entry request:', err);
+        });
+      }
     }
   };
 
@@ -98,12 +103,12 @@ export default function ParticipantPlayPage() {
   // Anti-cheat violation reporter with duration and question index
   const reportViolation = useCallback(
     async (type: string, durationMs: number = 0, qIndex?: number, details?: string) => {
-      // Ignore if disconnected, already removed, or warning modal is currently open waiting for user acknowledgement
-      if (!navigator.onLine || isRemoved || !participantId || isWarningModalOpenRef.current) return;
+      // Ignore only if completely disconnected, already permanently removed, or no participant ID
+      if (!navigator.onLine || isRemoved || !participantId) return;
 
       const now = Date.now();
-      // Throttle within 2000ms so multiple blur and visibility events don't double fire
-      if (now - lastViolationTimeRef.current < 2000) return;
+      // Throttle within 1500ms so multiple blur and visibility events don't duplicate on same action
+      if (now - lastViolationTimeRef.current < 1500) return;
       lastViolationTimeRef.current = now;
 
       const effectiveQIndex = qIndex ?? (currentQuestionIndexRef.current + 1);
@@ -181,6 +186,9 @@ export default function ParticipantPlayPage() {
     setParticipantId(storedId);
     setParticipantName(storedName || 'Participant');
 
+    // Initial Fullscreen check
+    setIsFullscreen(!!document.fullscreenElement);
+
     // Anti-cheat listeners with precise duration tracking
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -206,6 +214,35 @@ export default function ParticipantPlayPage() {
       }
     };
 
+    // Mobile app switch / minimize listeners
+    const handlePageHide = () => {
+      if (!awayStartTimeRef.current) {
+        awayStartTimeRef.current = Date.now();
+      }
+    };
+
+    const handlePageShow = () => {
+      if (awayStartTimeRef.current) {
+        const duration = Date.now() - awayStartTimeRef.current;
+        awayStartTimeRef.current = null;
+        reportViolation('app_minimized_or_switched', duration, currentQuestionIndexRef.current + 1);
+      }
+    };
+
+    // Back-button navigation trap (Android swipe gesture, back button, PC Alt+Left)
+    window.history.pushState(null, '', window.location.href);
+    const handlePopState = () => {
+      window.history.pushState(null, '', window.location.href);
+      reportViolation('back_navigation_attempted', 0, currentQuestionIndexRef.current + 1, 'Attempted to navigate back');
+    };
+
+    // Accidental tab close / reload prevention
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    };
+
     // Split-screen window resize detection
     const handleResize = () => {
       if (typeof window !== 'undefined' && window.screen.availWidth > 768) {
@@ -224,9 +261,10 @@ export default function ParticipantPlayPage() {
     };
 
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-      if (!document.fullscreenElement) {
-        reportViolation('fullscreen_exited', 0, currentQuestionIndexRef.current + 1);
+      const active = !!document.fullscreenElement;
+      setIsFullscreen(active);
+      if (!active) {
+        reportViolation('fullscreen_exited', 0, currentQuestionIndexRef.current + 1, 'Exited fullscreen mode');
       }
     };
 
@@ -252,6 +290,10 @@ export default function ParticipantPlayPage() {
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('blur', handleWindowBlur);
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('pagehide', handlePageHide);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('resize', handleResize);
     document.addEventListener('copy', handleCopy);
     document.addEventListener('cut', handleCopy);
@@ -287,6 +329,10 @@ export default function ParticipantPlayPage() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('blur', handleWindowBlur);
       window.removeEventListener('focus', handleWindowFocus);
+      window.removeEventListener('pagehide', handlePageHide);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('resize', handleResize);
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('cut', handleCopy);
@@ -631,15 +677,6 @@ export default function ParticipantPlayPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={toggleFullscreen}
-            title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
-            className="p-1.5 rounded-lg bg-slate-100 text-slate-700 hover:text-brand-purple hover:bg-slate-200 transition-all border border-slate-200"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-
           {/* Warning Badge */}
           {!showCompletionScreen && warningCount > 0 && (
             <div className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-amber-50 text-amber-700 border border-amber-300">
@@ -653,6 +690,33 @@ export default function ParticipantPlayPage() {
           <ThemeToggle />
         </div>
       </header>
+
+      {/* Mandatory Fullscreen Security Lock Overlay */}
+      {!isFullscreen && !showCompletionScreen && !isRemoved && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md text-center animate-in fade-in">
+          <div className="w-full max-w-sm sm:max-w-md p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl space-y-5">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-brand-purple/10 text-brand-purple flex items-center justify-center mx-auto shadow-sm">
+              <ShieldAlert className="w-7 h-7 sm:w-8 sm:h-8" />
+            </div>
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-brand-purple block">
+                Exam Mode Active
+              </span>
+              <h3 className="text-xl sm:text-2xl font-black text-brand-navy mt-1">Fullscreen Mode Required</h3>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                To ensure anti-cheat compliance, this quiz runs in locked Fullscreen mode. Exiting fullscreen, minimizing the browser, or switching apps triggers a security warning.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={enterFullscreen}
+              className="w-full py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-brand-purple to-brand-indigo text-white shadow-lg shadow-brand-purple/25 hover:opacity-95 transition-all cursor-pointer active:scale-98"
+            >
+              🔒 Tap to Lock Screen in Fullscreen
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Anti-Cheat Warning Modal (Warning 1, 2, and 3+ Flagged) */}
       {showWarningModal && (

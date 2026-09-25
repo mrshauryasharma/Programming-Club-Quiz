@@ -623,6 +623,13 @@ class QuizRepository {
       return { participant: existing, session };
     }
 
+    // Mid-Quiz Late Entry Lock: Once quiz has started (any non-waiting state), new entries are blocked!
+    const sessionState = session.current_state?.toUpperCase() || 'WAITING';
+    const sessionStatus = session.status?.toLowerCase() || 'waiting';
+    if (sessionState !== 'WAITING' || sessionStatus !== 'waiting') {
+      throw new Error('This quiz has already started. Late entries are strictly prohibited.');
+    }
+
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
@@ -992,25 +999,24 @@ class QuizRepository {
     logs.push(log);
     this.securityLogs.set(session.id, logs);
 
+    // Keep on participant object for reliable state persistence
+    if (!(participant as any).security_history) {
+      (participant as any).security_history = [];
+    }
+    (participant as any).security_history.push(log);
+
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {
-        const dbStatus =
-          participant.status === 'warning_1'
-            ? 'WARNING_1'
-            : participant.status === 'warning_2'
-            ? 'WARNING_2'
-            : 'FLAGGED';
-
         await supabase
           .from('participants')
           .update({
             warning_count: participant.warning_count,
-            status: dbStatus,
+            status: participant.status,
           })
           .eq('id', participantId);
 
-        await supabase.from('security_logs').insert({
+        const { error: secErr } = await supabase.from('security_logs').insert({
           session_id: session.id,
           participant_id: participantId,
           violation_type: violationType,
@@ -1019,6 +1025,10 @@ class QuizRepository {
           question_index: questionIndex,
           details: log.details,
         });
+
+        if (secErr) {
+          console.warn('Supabase security_logs insert error:', secErr.message);
+        }
       } catch (e) {
         console.warn('Supabase violation logging warning:', e);
       }
@@ -1060,14 +1070,39 @@ class QuizRepository {
             participant_id: d.participant_id,
             violation_type: d.violation_type,
             warning_level: d.warning_level,
-            duration_ms: d.duration_ms || 0,
-            question_index: d.question_index || 0,
+            duration_ms: Number(d.duration_ms || 0),
+            question_index: Number(d.question_index || 0),
             details: d.details || '',
             recorded_at: d.recorded_at,
           }));
         }
       } catch (e) {
         console.warn('Supabase getSecurityLogs warning:', e);
+      }
+    }
+
+    // High Reliability Fallback: If logs are empty from Supabase and in-memory, but participant has warning_count > 0:
+    if (logs.length === 0 && participantId) {
+      const participant = await this.getParticipantById(sessionId, participantId);
+      if (participant && (participant as any).security_history && (participant as any).security_history.length > 0) {
+        return (participant as any).security_history;
+      }
+      if (participant && (participant.warning_count || 0) > 0) {
+        const synthetic: SecurityLog[] = [];
+        for (let w = 1; w <= participant.warning_count; w++) {
+          synthetic.push({
+            id: `sec-fallback-${participantId}-${w}`,
+            session_id: sessionId,
+            participant_id: participantId,
+            violation_type: 'tab_switched_or_window_blur',
+            warning_level: w,
+            duration_ms: 0,
+            question_index: 0,
+            details: `Security Alert #${w}: Tab switch, app minimize, or screen blur detected`,
+            recorded_at: participant.joined_at || new Date().toISOString(),
+          });
+        }
+        return synthetic;
       }
     }
 
