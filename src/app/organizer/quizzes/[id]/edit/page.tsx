@@ -95,7 +95,7 @@ export default function EditQuizPage({ params }: { params: Promise<{ id: string 
       }
     }
     loadQuiz();
-  }, [quizId]);
+  }, [quizId, isAuthenticated]);
 
   const addQuestion = () => {
     setQuestions([
