@@ -19,16 +19,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ code: s
       return NextResponse.json({ valid: false, error: 'This quiz session has already concluded.' }, { status: 400 });
     }
 
-    const sessionState = session.current_state?.toUpperCase() || 'WAITING';
-    const sessionStatus = session.status?.toLowerCase() || 'waiting';
-    if (sessionState !== 'WAITING' || sessionStatus !== 'waiting') {
-      return NextResponse.json({
-        valid: false,
-        error: 'This quiz has already started. Late entries are strictly prohibited.',
-        already_started: true,
-      }, { status: 403 });
-    }
-
+    // Allow participants to validate and join as long as session is not completed
     const quiz = await db.getQuizById(session.quiz_id);
 
     return NextResponse.json({

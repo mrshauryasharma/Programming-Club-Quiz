@@ -623,13 +623,6 @@ class QuizRepository {
       return { participant: existing, session };
     }
 
-    // Mid-Quiz Late Entry Lock: Once quiz has started (any non-waiting state), new entries are blocked!
-    const sessionState = session.current_state?.toUpperCase() || 'WAITING';
-    const sessionStatus = session.status?.toLowerCase() || 'waiting';
-    if (sessionState !== 'WAITING' || sessionStatus !== 'waiting') {
-      throw new Error('This quiz has already started. Late entries are strictly prohibited.');
-    }
-
     const supabase = getSupabaseServerClient();
     if (supabase) {
       try {

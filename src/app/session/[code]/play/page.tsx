@@ -53,24 +53,24 @@ export default function ParticipantPlayPage() {
 
   // Network & System state
   const [isConnected, setIsConnected] = useState(true);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [timerRemainingSec, setTimerRemainingSec] = useState<number>(30);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Mandatory Fullscreen helper
-  const enterFullscreen = () => {
-    if (typeof document !== 'undefined') {
-      const el = document.documentElement as any;
-      const requestMethod =
-        el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-      if (requestMethod) {
-        requestMethod.call(el).then(() => {
-          setIsFullscreen(true);
-        }).catch((err: any) => {
-          console.warn('Fullscreen entry request:', err);
-        });
-      }
+  // Question 1 timer awareness notice state
+  const [showFirstQuestionNotice, setShowFirstQuestionNotice] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return !sessionStorage.getItem(`pc_timer_notice_${code}`);
     }
+    return true;
+  });
+  const [noticeCountdown, setNoticeCountdown] = useState<number>(3);
+
+  const handleStartFirstQuestion = () => {
+    setShowFirstQuestionNotice(false);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem(`pc_timer_notice_${code}`, 'true');
+    }
+    questionStartTimeRef.current = Date.now();
   };
 
   const lastViolationTimeRef = useRef<number>(0);
@@ -186,9 +186,6 @@ export default function ParticipantPlayPage() {
     setParticipantId(storedId);
     setParticipantName(storedName || 'Participant');
 
-    // Initial Fullscreen check
-    setIsFullscreen(!!document.fullscreenElement);
-
     // Anti-cheat listeners with precise duration tracking
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -260,14 +257,6 @@ export default function ParticipantPlayPage() {
       e.preventDefault();
     };
 
-    const handleFullscreenChange = () => {
-      const active = !!document.fullscreenElement;
-      setIsFullscreen(active);
-      if (!active) {
-        reportViolation('fullscreen_exited', 0, currentQuestionIndexRef.current + 1, 'Exited fullscreen mode');
-      }
-    };
-
     // Network connection listeners
     const handleOnline = () => {
       setIsConnected(true);
@@ -298,7 +287,6 @@ export default function ParticipantPlayPage() {
     document.addEventListener('copy', handleCopy);
     document.addEventListener('cut', handleCopy);
     document.addEventListener('contextmenu', handleContextMenu);
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
@@ -337,7 +325,6 @@ export default function ParticipantPlayPage() {
       document.removeEventListener('copy', handleCopy);
       document.removeEventListener('cut', handleCopy);
       document.removeEventListener('contextmenu', handleContextMenu);
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
@@ -477,13 +464,42 @@ export default function ParticipantPlayPage() {
     }
   }, []);
 
+  // Notice countdown tick for Question 1
+  useEffect(() => {
+    if (
+      showFirstQuestionNotice &&
+      myQuestionIndex === 0 &&
+      !showCompletionScreen &&
+      sessionState?.current_state !== 'WAITING' &&
+      (questionsList.length > 0 || activeQuestion)
+    ) {
+      const timer = setInterval(() => {
+        setNoticeCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            setShowFirstQuestionNotice(false);
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem(`pc_timer_notice_${code}`, 'true');
+            }
+            questionStartTimeRef.current = Date.now();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [showFirstQuestionNotice, myQuestionIndex, showCompletionScreen, sessionState?.current_state, questionsList.length, activeQuestion, code]);
+
   // Per-question timer countdown tick
   useEffect(() => {
+    const isNoticeShowing = showFirstQuestionNotice && myQuestionIndex === 0;
     const isQuizActive =
       !showCompletionScreen &&
       sessionState?.current_state !== 'WAITING' &&
       sessionState?.current_state !== 'FINAL_RESULTS' &&
-      sessionState?.current_state !== 'COMPLETED';
+      sessionState?.current_state !== 'COMPLETED' &&
+      !isNoticeShowing;
 
     if (isQuizActive) {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
@@ -501,7 +517,7 @@ export default function ParticipantPlayPage() {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [sessionState?.current_state, showCompletionScreen]);
+  }, [sessionState?.current_state, showCompletionScreen, showFirstQuestionNotice, myQuestionIndex]);
 
   // Handle timer running out (0s): auto advance and record timeout so student cannot go back
   useEffect(() => {
@@ -691,28 +707,38 @@ export default function ParticipantPlayPage() {
         </div>
       </header>
 
-      {/* Mandatory Fullscreen Security Lock Overlay */}
-      {!isFullscreen && !showCompletionScreen && !isRemoved && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md text-center animate-in fade-in">
-          <div className="w-full max-w-sm sm:max-w-md p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl space-y-5">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-brand-purple/10 text-brand-purple flex items-center justify-center mx-auto shadow-sm">
-              <ShieldAlert className="w-7 h-7 sm:w-8 sm:h-8" />
+      {/* Question 1 Timer Awareness Notice Modal (Shown only on Question 1) */}
+      {showFirstQuestionNotice && myQuestionIndex === 0 && !showCompletionScreen && !isRemoved && sessionState?.current_state !== 'WAITING' && (questionsList.length > 0 || activeQuestion) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-in fade-in">
+          <div className="w-full max-w-sm sm:max-w-md p-6 sm:p-8 rounded-3xl bg-white border border-slate-200 shadow-2xl text-center space-y-4 animate-in zoom-in-95">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-sm">
+              <Clock className="w-8 h-8" />
             </div>
             <div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-brand-purple block">
-                Exam Mode Active
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 block">
+                Quiz Time Limit Alert
               </span>
-              <h3 className="text-xl sm:text-2xl font-black text-brand-navy mt-1">Fullscreen Mode Required</h3>
+              <h3 className="text-xl sm:text-2xl font-black text-brand-navy mt-1">
+                Every Question Has a Timer!
+              </h3>
               <p className="text-xs text-slate-600 mt-2 leading-relaxed">
-                To ensure anti-cheat compliance, this quiz runs in locked Fullscreen mode. Exiting fullscreen, minimizing the browser, or switching apps triggers a security warning.
+                Har question me countdown timer laga hua hai. Question screen open hote hi timer chalega, samay samapt hone se pehle apna sahi option select karke submit karein!
               </p>
             </div>
+
+            <div className="py-2">
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-50 border border-slate-200 text-xs font-mono font-bold text-slate-700 shadow-inner">
+                <span>Question 1 timer starts in:</span>
+                <span className="text-base font-black text-brand-purple">{noticeCountdown}s</span>
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={enterFullscreen}
-              className="w-full py-3.5 rounded-xl font-bold text-sm bg-gradient-to-r from-brand-purple to-brand-indigo text-white shadow-lg shadow-brand-purple/25 hover:opacity-95 transition-all cursor-pointer active:scale-98"
+              onClick={handleStartFirstQuestion}
+              className="w-full py-3.5 rounded-xl font-bold text-xs bg-gradient-to-r from-brand-purple to-brand-indigo hover:from-[#6A1694] hover:to-[#2F2766] text-white shadow-lg shadow-brand-purple/25 transition-all cursor-pointer active:scale-98"
             >
-              🔒 Tap to Lock Screen in Fullscreen
+              I am Ready &bull; Start Question 1 Now
             </button>
           </div>
         </div>
