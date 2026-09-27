@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Pencil,
   Edit3,
+  Copy,
 } from 'lucide-react';
 
 import { useOrganizerAuth } from '@/lib/useOrganizerAuth';
@@ -27,6 +28,7 @@ export default function OrganizerDashboardPage() {
   const [quizzes, setQuizzes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [startingSessionId, setStartingSessionId] = useState<string | null>(null);
+  const [copyingQuizId, setCopyingQuizId] = useState<string | null>(null);
 
   const fetchQuizzes = async () => {
     try {
@@ -75,6 +77,41 @@ export default function OrganizerDashboardPage() {
       fetchQuizzes();
     } catch (e) {
       alert('Failed to delete');
+    }
+  };
+
+  const handleCopyQuiz = async (quizId: string, title: string) => {
+    setCopyingQuizId(quizId);
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}`);
+      if (!res.ok) throw new Error('Failed to fetch quiz data');
+      const { quiz } = await res.json();
+
+      const copyRes = await fetch('/api/quizzes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Copy of ${title}`,
+          description: quiz.description || '',
+          questions: (quiz.questions || []).map((q: any) => ({
+            question_text: q.question_text || q.text,
+            options: q.options,
+            correct_option_index: q.correct_option_index ?? q.correct_option ?? 0,
+            timer_seconds: q.timer_seconds ?? q.time_limit ?? 30,
+          })),
+        }),
+      });
+
+      if (!copyRes.ok) {
+        const errData = await copyRes.json();
+        throw new Error(errData.error || 'Failed to copy quiz');
+      }
+
+      fetchQuizzes();
+    } catch (err: any) {
+      alert(err.message || 'Error copying quiz');
+    } finally {
+      setCopyingQuizId(null);
     }
   };
 
@@ -202,6 +239,18 @@ export default function OrganizerDashboardPage() {
                       >
                         <Pencil className="w-4 h-4" />
                       </Link>
+                      <button
+                        onClick={() => handleCopyQuiz(quiz.id, quiz.title)}
+                        disabled={copyingQuizId === quiz.id}
+                        className="text-slate-400 hover:text-emerald-600 p-1.5 rounded-lg hover:bg-emerald-500/10 transition-colors cursor-pointer disabled:opacity-50"
+                        title="Duplicate quiz"
+                      >
+                        {copyingQuizId === quiz.id ? (
+                          <div className="w-4 h-4 border-2 border-emerald-400/30 border-t-emerald-500 rounded-full animate-spin" />
+                        ) : (
+                          <Copy className="w-4 h-4" />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleDeleteQuiz(quiz.id)}
                         className="text-slate-400 hover:text-rose-500 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer"

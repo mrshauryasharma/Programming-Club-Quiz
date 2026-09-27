@@ -600,12 +600,6 @@ class QuizRepository {
     if (!cleanRoll) throw new Error('Roll Number is required');
     if (!cleanEmail || !cleanEmail.includes('@')) throw new Error('A valid Email ID is required');
 
-    // Strict Rule: Single attempt per quiz. A student cannot re-attempt an already completed quiz.
-    const hasAlreadyCompleted = await this.hasParticipantCompletedQuiz(session.quiz_id, cleanRoll, cleanEmail);
-    if (hasAlreadyCompleted) {
-      throw new Error(`Roll Number ${cleanRoll} has already completed this quiz. Multiple attempts are strictly prohibited.`);
-    }
-
     // Fetch existing participants in THIS active session
     let pList = await this.getParticipants(session.id);
 
