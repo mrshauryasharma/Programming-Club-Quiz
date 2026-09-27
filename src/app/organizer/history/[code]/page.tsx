@@ -25,19 +25,29 @@ export default function QuizHistoryAnalyticsPage() {
 
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || !code) return;
+    setLoading(true);
+    setError(null);
     fetch(`/api/sessions/${code}/analytics`)
-      .then((res) => res.json())
+      .then((res) => {
+        if (!res.ok) throw new Error(`Failed to load analytics (${res.status})`);
+        return res.json();
+      })
       .then((data) => {
         if (data.analytics) setAnalytics(data.analytics);
+        else setError('Analytics data not available for this session');
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error(err);
+        setError(err.message || 'Failed to load analytics');
+      })
       .finally(() => setLoading(false));
   }, [code, isAuthenticated]);
 
-  if (isAuthenticated === null || loading) {
+  if (isAuthenticated === null) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9]">
         <div className="flex flex-col items-center gap-3">
@@ -52,19 +62,46 @@ export default function QuizHistoryAnalyticsPage() {
     return null;
   }
 
-  if (!analytics) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
-        <h2 className="text-xl font-bold">Analytics not found for session {code}</h2>
-        <Link href="/organizer/dashboard" className="mt-4 text-xs font-bold text-brand-purple underline">
-          Back to Dashboard
-        </Link>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-3 border-brand-purple/30 border-t-brand-purple rounded-full animate-spin" />
+          <p className="text-xs font-semibold text-slate-500">Loading analytics &amp; results...</p>
+        </div>
       </div>
     );
   }
 
-  const { quiz, totalParticipants, maxScore, averageScore, leaderboard, questionSummaries, mostDifficultQuestion } =
-    analytics;
+  if (!analytics) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
+        <h2 className="text-xl font-bold">Analytics not found for session {code}</h2>
+        {error && <p className="text-xs text-rose-500 mt-2 font-mono">{error}</p>}
+        <div className="flex items-center gap-3 mt-4">
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 rounded-xl bg-brand-purple text-white text-xs font-bold shadow-sm hover:bg-[#6A1694] transition-all cursor-pointer"
+          >
+            Retry
+          </button>
+          <Link href="/organizer/history" className="text-xs font-bold text-slate-600 hover:text-brand-purple underline">
+            Back to Event History
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const {
+    quiz,
+    totalParticipants = 0,
+    maxScore = 0,
+    averageScore = '0.0',
+    leaderboard = [],
+    questionSummaries = [],
+    mostDifficultQuestion,
+  } = analytics || {};
 
   return (
     <main className="min-h-screen p-4 sm:p-8 bg-gradient-to-b from-[#F8FAFC] via-white to-[#F1F5F9] text-[#031246]">
@@ -125,9 +162,11 @@ export default function QuizHistoryAnalyticsPage() {
           <span className="text-xs font-bold uppercase tracking-wider text-brand-purple">
             Performance Analytics & Report
           </span>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-brand-navy mt-1">{quiz.title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-brand-navy mt-1">
+            {quiz?.title || 'Quiz Session'}
+          </h1>
           <p className="text-xs text-slate-500 mt-0.5 font-mono">
-            GAME CODE: {code} • DATE: {new Date(analytics.session.created_at).toLocaleDateString()}
+            GAME CODE: {code} • DATE: {analytics?.session?.created_at ? new Date(analytics.session.created_at).toLocaleDateString() : 'N/A'}
           </p>
         </div>
 

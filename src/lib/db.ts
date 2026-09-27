@@ -490,6 +490,8 @@ class QuizRepository {
   public async getSessionById(id: string): Promise<Session | null> {
     if (!id) return null;
     const trimmed = id.trim();
+    const cached = this.sessions.get(trimmed) || this.sessions.get(trimmed.toUpperCase());
+    if (cached) return cached;
 
     const supabase = getSupabaseServerClient();
     if (supabase) {
@@ -1419,6 +1421,30 @@ class QuizRepository {
 
     const participants = await this.getParticipants(session.id);
     const leaderboard = await this.getLeaderboard(session.id);
+
+    // Pre-cache answers for this session so question summaries don't make 25 redundant Supabase roundtrips
+    if (!this.answers.has(session.id)) {
+      const supabase = getSupabaseServerClient();
+      if (supabase) {
+        try {
+          const { data } = await supabase.from('answers').select('*').eq('session_id', session.id);
+          const mapped = (data || []).map((d: any) => ({
+            id: d.id,
+            session_id: d.session_id,
+            participant_id: d.participant_id,
+            question_id: d.question_id,
+            selected_option: d.selected_option,
+            is_correct: d.is_correct,
+            points: d.points_awarded ?? (d.is_correct ? 2 : 0),
+            response_time_ms: d.response_time_ms ?? 0,
+            submitted_at: d.created_at || new Date().toISOString(),
+          }));
+          this.answers.set(session.id, mapped);
+        } catch (e) {
+          console.warn('Failed to pre-fetch answers for analytics:', e);
+        }
+      }
+    }
 
     const questionSummaries: QuestionResultSummary[] = [];
     for (let i = 0; i < quiz.questions.length; i++) {
